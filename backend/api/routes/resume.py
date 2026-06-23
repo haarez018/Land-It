@@ -4,22 +4,54 @@ import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from backend.auth_deps import get_current_user_id
+from backend.db import get_db
 from backend.parsers.resume_parser import parse_resume
 from backend.parsers.jd_parser import parse_jd
 from backend.parsers.schemas import Resume, JobDescription
-from backend.memory.sqlite_store import JSONSQLiteStore
 
 router = APIRouter()
 
-_resume_store = JSONSQLiteStore("resumes", Resume)
+# JD cache — session-scoped, non-sensitive
 _jd_store: dict[str, JobDescription] = {}
 
 
+# ── Supabase helpers (exported so other routes can use them) ─────────────────
+
+def load_user_resume(resume_id: str, user_id: str) -> Resume:
+    """Fetch a resume from Supabase. Raises 404 if not found or not owned by user."""
+    resp = (
+        get_db().table("resumes")
+        .select("data")
+        .eq("id", resume_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if not resp.data:
+        raise HTTPException(404, "Resume not found")
+    return Resume.model_validate(resp.data[0]["data"])
+
+
+def save_user_resume(resume: Resume, user_id: str, filename: str = "") -> None:
+    """Upsert a resume into Supabase."""
+    get_db().table("resumes").upsert({
+        "id": resume.id,
+        "user_id": user_id,
+        "data": resume.model_dump(),
+        "filename": filename,
+    }).execute()
+
+
+# ── Upload ───────────────────────────────────────────────────────────────────
+
 @router.post("/upload", response_model=Resume)
-async def upload_resume(file: UploadFile = File(...)):
+async def upload_resume(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id),
+):
     if not file.filename:
         raise HTTPException(400, "No file provided")
 
@@ -39,15 +71,13 @@ async def upload_resume(file: UploadFile = File(...)):
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
-    _resume_store[resume.id] = resume
+    save_user_resume(resume, user_id, filename=file.filename or "")
     return resume
 
 
 @router.get("/{resume_id}", response_model=Resume)
-async def get_resume(resume_id: str):
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
-    return _resume_store[resume_id]
+async def get_resume(resume_id: str, user_id: str = Depends(get_current_user_id)):
+    return load_user_resume(resume_id, user_id)
 
 
 # ── Scoring ─────────────────────────────────────────────────────────────────
@@ -84,39 +114,28 @@ class ScoreResponse(BaseModel):
 
 
 @router.post("/{resume_id}/score", response_model=ScoreResponse)
-async def score_resume_endpoint(resume_id: str, request: ScoreRequest):
+async def score_resume_endpoint(
+    resume_id: str,
+    request: ScoreRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Score a resume against a JD using the 14-dimension ATS scorer."""
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
-
-    resume = _resume_store[resume_id]
-
-    # Parse the JD
+    resume = load_user_resume(resume_id, user_id)
     jd = parse_jd(request.jd_text)
     _jd_store[jd.id] = jd
 
     from backend.agents.tailor.weightage.scorer_engine import score_resume
-
-    result = await score_resume(
-        resume, jd,
-        role_type=request.role_type,
-        seniority=request.seniority,
-    )
+    result = await score_resume(resume, jd, role_type=request.role_type, seniority=request.seniority)
 
     return ScoreResponse(
         total_score=result.total_score,
         letter_grade=result.letter_grade,
         dimension_scores=[
             DimensionScoreResponse(
-                dimension_id=d.dimension_id,
-                dimension_name=d.dimension_name,
-                raw_score=d.raw_score,
-                weighted_score=d.weighted_score,
-                weight=d.weight,
-                explanation=d.explanation,
-                issues=d.issues,
-                suggestions=d.suggestions,
-                priority=d.priority,
+                dimension_id=d.dimension_id, dimension_name=d.dimension_name,
+                raw_score=d.raw_score, weighted_score=d.weighted_score,
+                weight=d.weight, explanation=d.explanation,
+                issues=d.issues, suggestions=d.suggestions, priority=d.priority,
             )
             for d in result.dimension_scores
         ],
@@ -165,23 +184,22 @@ class TailorResponse(BaseModel):
 
 
 @router.post("/{resume_id}/tailor", response_model=TailorResponse)
-async def tailor_resume(resume_id: str, request: TailorRequest):
+async def tailor_resume(
+    resume_id: str,
+    request: TailorRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Run the full tailor pipeline: score → 6-pass rewrite → re-score → diff."""
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
-
-    resume = _resume_store[resume_id]
+    resume = load_user_resume(resume_id, user_id)
     jd = parse_jd(request.jd_text)
     _jd_store[jd.id] = jd
 
     from backend.agents.tailor.agent import TailorAgent
-
     agent = TailorAgent()
     skip = set(request.skip_passes) if request.skip_passes else None
     result = await agent.tailor(resume, jd, skip_passes=skip)
 
-    # Store the rewritten resume
-    _resume_store[result.rewritten_resume.id] = result.rewritten_resume
+    save_user_resume(result.rewritten_resume, user_id)
 
     return TailorResponse(
         score_before=result.score_before.total_score,
@@ -192,13 +210,9 @@ async def tailor_resume(resume_id: str, request: TailorRequest):
         predicted_ats_pass=result.score_after.predicted_ats_pass,
         change_log=[
             ChangeLogEntry(
-                section=c.section,
-                original=c.original,
-                rewritten=c.rewritten,
-                reason=c.reason,
-                dimension_improved=c.dimension_improved,
-                confidence=c.confidence,
-                requires_verification=c.requires_verification,
+                section=c.section, original=c.original, rewritten=c.rewritten,
+                reason=c.reason, dimension_improved=c.dimension_improved,
+                confidence=c.confidence, requires_verification=c.requires_verification,
             )
             for c in result.rewrite_result.change_log
         ],
@@ -212,7 +226,7 @@ async def tailor_resume(resume_id: str, request: TailorRequest):
     )
 
 
-# ── Standout Scoring ───────────────────────────────────────────────────────
+# ── Standout Scoring ──────────────────────────────────────────────────────
 
 
 class StandoutDimensionScoreResponse(BaseModel):
@@ -241,37 +255,28 @@ class StandoutScoreResponse(BaseModel):
 
 
 @router.post("/{resume_id}/score/standout", response_model=StandoutScoreResponse)
-async def score_standout_endpoint(resume_id: str, request: ScoreRequest):
+async def score_standout_endpoint(
+    resume_id: str,
+    request: ScoreRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Score a resume on the 8 Standout (human-impression) dimensions."""
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
-
-    resume = _resume_store[resume_id]
+    resume = load_user_resume(resume_id, user_id)
     jd = parse_jd(request.jd_text)
     _jd_store[jd.id] = jd
 
     from backend.agents.tailor.standout.engine import score_standout
-
-    result = await score_standout(
-        resume, jd,
-        role_type=request.role_type,
-        seniority=request.seniority,
-    )
+    result = await score_standout(resume, jd, role_type=request.role_type, seniority=request.seniority)
 
     return StandoutScoreResponse(
         total_score=result.total_score,
         letter_grade=result.letter_grade,
         dimension_scores=[
             StandoutDimensionScoreResponse(
-                dimension_id=d.dimension_id,
-                dimension_name=d.dimension_name,
-                raw_score=d.raw_score,
-                weighted_score=d.weighted_score,
-                weight=d.weight,
-                explanation=d.explanation,
-                issues=d.issues,
-                suggestions=d.suggestions,
-                priority=d.priority,
+                dimension_id=d.dimension_id, dimension_name=d.dimension_name,
+                raw_score=d.raw_score, weighted_score=d.weighted_score,
+                weight=d.weight, explanation=d.explanation,
+                issues=d.issues, suggestions=d.suggestions, priority=d.priority,
             )
             for d in result.dimension_scores
         ],
@@ -314,71 +319,51 @@ class DualScoreResponse(BaseModel):
 
 
 @router.post("/{resume_id}/score/dual", response_model=DualScoreResponse)
-async def dual_score_endpoint(resume_id: str, request: ScoreRequest):
+async def dual_score_endpoint(
+    resume_id: str,
+    request: ScoreRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Score a resume on all 22 dimensions: 14 ATS + 8 Standout."""
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
-
-    resume = _resume_store[resume_id]
+    resume = load_user_resume(resume_id, user_id)
     jd = parse_jd(request.jd_text)
     _jd_store[jd.id] = jd
 
     from backend.agents.tailor.agent import TailorAgent
-
     agent = TailorAgent()
-    result = await agent.score_dual(
-        resume, jd,
-        role_type=request.role_type,
-        seniority=request.seniority,
-    )
+    result = await agent.score_dual(resume, jd, role_type=request.role_type, seniority=request.seniority)
 
     return DualScoreResponse(
         ats_score=ScoreResponse(
-            total_score=result.ats.total_score,
-            letter_grade=result.ats.letter_grade,
+            total_score=result.ats.total_score, letter_grade=result.ats.letter_grade,
             dimension_scores=[
                 DimensionScoreResponse(
-                    dimension_id=d.dimension_id,
-                    dimension_name=d.dimension_name,
-                    raw_score=d.raw_score,
-                    weighted_score=d.weighted_score,
-                    weight=d.weight,
-                    explanation=d.explanation,
-                    issues=d.issues,
-                    suggestions=d.suggestions,
-                    priority=d.priority,
+                    dimension_id=d.dimension_id, dimension_name=d.dimension_name,
+                    raw_score=d.raw_score, weighted_score=d.weighted_score,
+                    weight=d.weight, explanation=d.explanation,
+                    issues=d.issues, suggestions=d.suggestions, priority=d.priority,
                 )
                 for d in result.ats.dimension_scores
             ],
-            top_3_issues=result.ats.top_3_issues,
-            top_3_wins=result.ats.top_3_wins,
+            top_3_issues=result.ats.top_3_issues, top_3_wins=result.ats.top_3_wins,
             predicted_ats_pass=result.ats.predicted_ats_pass,
-            role_type=result.ats.role_type,
-            seniority_level=result.ats.seniority_level,
+            role_type=result.ats.role_type, seniority_level=result.ats.seniority_level,
             weights_used=result.ats.weights_used,
         ),
         standout_score=StandoutScoreResponse(
-            total_score=result.standout.total_score,
-            letter_grade=result.standout.letter_grade,
+            total_score=result.standout.total_score, letter_grade=result.standout.letter_grade,
             dimension_scores=[
                 StandoutDimensionScoreResponse(
-                    dimension_id=d.dimension_id,
-                    dimension_name=d.dimension_name,
-                    raw_score=d.raw_score,
-                    weighted_score=d.weighted_score,
-                    weight=d.weight,
-                    explanation=d.explanation,
-                    issues=d.issues,
-                    suggestions=d.suggestions,
-                    priority=d.priority,
+                    dimension_id=d.dimension_id, dimension_name=d.dimension_name,
+                    raw_score=d.raw_score, weighted_score=d.weighted_score,
+                    weight=d.weight, explanation=d.explanation,
+                    issues=d.issues, suggestions=d.suggestions, priority=d.priority,
                 )
                 for d in result.standout.dimension_scores
             ],
-            top_3_issues=result.standout.top_3_issues,
-            top_3_wins=result.standout.top_3_wins,
+            top_3_issues=result.standout.top_3_issues, top_3_wins=result.standout.top_3_wins,
             spike_detected=result.standout.spike_detected,
-            role_type=result.standout.role_type,
-            seniority_level=result.standout.seniority_level,
+            role_type=result.standout.role_type, seniority_level=result.standout.seniority_level,
             weights_used=result.standout.weights_used,
             amplification_tips=result.standout.amplification_tips,
         ),
@@ -403,27 +388,23 @@ async def dual_score_endpoint(resume_id: str, request: ScoreRequest):
     )
 
 
-# ── Callback Prediction ──────────────────────────────────────────────────
+# ── Callback Prediction ───────────────────────────────────────────────────
 
 
 @router.post("/{resume_id}/predict-callback", response_model=CallbackPredictionResponse)
-async def predict_callback_endpoint(resume_id: str, request: ScoreRequest):
+async def predict_callback_endpoint(
+    resume_id: str,
+    request: ScoreRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Predict interview callback probability using the 22-dimension dual score."""
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
-
-    resume = _resume_store[resume_id]
+    resume = load_user_resume(resume_id, user_id)
     jd = parse_jd(request.jd_text)
     _jd_store[jd.id] = jd
 
     from backend.agents.tailor.agent import TailorAgent
-
     agent = TailorAgent()
-    dual = await agent.score_dual(
-        resume, jd,
-        role_type=request.role_type,
-        seniority=request.seniority,
-    )
+    dual = await agent.score_dual(resume, jd, role_type=request.role_type, seniority=request.seniority)
 
     pred = dual.callback_prediction
     if pred is None:
@@ -496,14 +477,14 @@ class ABTestResponse(BaseModel):
 
 
 @router.post("/{resume_id}/ab-test", response_model=ABTestResponse)
-async def ab_test_endpoint(resume_id: str, request: ABTestRequest):
+async def ab_test_endpoint(
+    resume_id: str,
+    request: ABTestRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """A/B test two resume versions against the same JD on all 22 dimensions."""
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume A not found")
+    version_a = load_user_resume(resume_id, user_id)
 
-    version_a = _resume_store[resume_id]
-
-    # Parse version B on the fly from raw text
     from backend.parsers.resume_parser import parse_resume_text
     version_b = parse_resume_text(request.resume_b_text)
 
@@ -511,27 +492,15 @@ async def ab_test_endpoint(resume_id: str, request: ABTestRequest):
     _jd_store[jd.id] = jd
 
     from backend.agents.tailor.ab_testing import ab_test_resumes
-
-    result = await ab_test_resumes(
-        version_a, version_b, jd,
-        role_type=request.role_type,
-        seniority=request.seniority,
-    )
+    result = await ab_test_resumes(version_a, version_b, jd, role_type=request.role_type, seniority=request.seniority)
 
     return ABTestResponse(
-        version_a_id=result.version_a_id,
-        version_b_id=result.version_b_id,
-        jd_id=result.jd_id,
-        version_a_ats=result.version_a_ats,
-        version_b_ats=result.version_b_ats,
-        version_a_standout=result.version_a_standout,
-        version_b_standout=result.version_b_standout,
-        version_a_combined=result.version_a_combined,
-        version_b_combined=result.version_b_combined,
-        version_a_callback=result.version_a_callback,
-        version_b_callback=result.version_b_callback,
-        overall_winner=result.overall_winner,
-        win_margin=result.win_margin,
+        version_a_id=result.version_a_id, version_b_id=result.version_b_id, jd_id=result.jd_id,
+        version_a_ats=result.version_a_ats, version_b_ats=result.version_b_ats,
+        version_a_standout=result.version_a_standout, version_b_standout=result.version_b_standout,
+        version_a_combined=result.version_a_combined, version_b_combined=result.version_b_combined,
+        version_a_callback=result.version_a_callback, version_b_callback=result.version_b_callback,
+        overall_winner=result.overall_winner, win_margin=result.win_margin,
         dimension_comparisons=[
             DimensionComparisonResponse(
                 dimension_id=c.dimension_id, dimension_name=c.dimension_name,
@@ -539,20 +508,17 @@ async def ab_test_endpoint(resume_id: str, request: ABTestRequest):
                 winner=c.winner, weight=c.weight, weighted_impact=c.weighted_impact,
             ) for c in result.dimension_comparisons
         ],
-        a_advantages=result.a_advantages,
-        b_advantages=result.b_advantages,
+        a_advantages=result.a_advantages, b_advantages=result.b_advantages,
         merge_suggestions=[
-            MergeSuggestionResponse(
-                section=m.section, recommendation=m.recommendation, reason=m.reason,
-            ) for m in result.merge_suggestions
+            MergeSuggestionResponse(section=m.section, recommendation=m.recommendation, reason=m.reason)
+            for m in result.merge_suggestions
         ],
         recommendation=result.recommendation,
-        role_type=result.role_type,
-        seniority_level=result.seniority_level,
+        role_type=result.role_type, seniority_level=result.seniority_level,
     )
 
 
-# ── Skill Gap Analysis ─────────────────────────────────────────────────
+# ── Skill Gap Analysis ────────────────────────────────────────────────────
 
 
 class SkillGapResponse(BaseModel):
@@ -582,7 +548,41 @@ class SkillGapRequest(BaseModel):
     jd_text: str
 
 
-# ── Batch Scoring ──────────────────────────────────────────────────────
+@router.post("/{resume_id}/skill-gaps", response_model=SkillGapAnalysisResponse)
+async def skill_gap_endpoint(
+    resume_id: str,
+    request: SkillGapRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Analyze skill gaps between a resume and a JD."""
+    resume = load_user_resume(resume_id, user_id)
+    jd = parse_jd(request.jd_text)
+
+    from backend.agents.tailor.skill_gap import analyze_skill_gaps
+    result = analyze_skill_gaps(resume, jd)
+
+    def _gap_resp(g):
+        return SkillGapResponse(
+            skill=g.skill, category=g.category, jd_context=g.jd_context,
+            score_impact=g.score_impact, difficulty=g.difficulty, suggestion=g.suggestion,
+        )
+
+    return SkillGapAnalysisResponse(
+        total_gaps=result.total_gaps,
+        critical_gaps=[_gap_resp(g) for g in result.critical_gaps],
+        recommended_gaps=[_gap_resp(g) for g in result.recommended_gaps],
+        bonus_gaps=[_gap_resp(g) for g in result.bonus_gaps],
+        matched_skills=result.matched_skills,
+        match_percentage=result.match_percentage,
+        total_potential_score_gain=result.total_potential_score_gain,
+        top_3_highest_impact_gaps=[_gap_resp(g) for g in result.top_3_highest_impact_gaps],
+        quick_wins=result.quick_wins,
+        short_term=result.short_term,
+        long_term=result.long_term,
+    )
+
+
+# ── Batch Scoring ─────────────────────────────────────────────────────────
 
 
 class BatchScoreEntryResponse(BaseModel):
@@ -617,18 +617,19 @@ class BatchScoreRequest(BaseModel):
 
 
 @router.post("/{resume_id}/batch-score", response_model=BatchScoreResultResponse)
-async def batch_score_endpoint(resume_id: str, request: BatchScoreRequest):
+async def batch_score_endpoint(
+    resume_id: str,
+    request: BatchScoreRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Score a resume against multiple JDs simultaneously."""
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
     if len(request.jd_texts) > 10:
         raise HTTPException(400, "Maximum 10 JDs per batch")
 
-    resume = _resume_store[resume_id]
+    resume = load_user_resume(resume_id, user_id)
     jds = [parse_jd(text) for text in request.jd_texts]
 
     from backend.agents.tailor.batch_scorer import batch_score
-
     result = await batch_score(resume, jds)
 
     def _entry(e):
@@ -654,41 +655,7 @@ async def batch_score_endpoint(resume_id: str, request: BatchScoreRequest):
     )
 
 
-@router.post("/{resume_id}/skill-gaps", response_model=SkillGapAnalysisResponse)
-async def skill_gap_endpoint(resume_id: str, request: SkillGapRequest):
-    """Analyze skill gaps between a resume and a JD."""
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
-
-    resume = _resume_store[resume_id]
-    jd = parse_jd(request.jd_text)
-
-    from backend.agents.tailor.skill_gap import analyze_skill_gaps
-
-    result = analyze_skill_gaps(resume, jd)
-
-    def _gap_resp(g):
-        return SkillGapResponse(
-            skill=g.skill, category=g.category, jd_context=g.jd_context,
-            score_impact=g.score_impact, difficulty=g.difficulty, suggestion=g.suggestion,
-        )
-
-    return SkillGapAnalysisResponse(
-        total_gaps=result.total_gaps,
-        critical_gaps=[_gap_resp(g) for g in result.critical_gaps],
-        recommended_gaps=[_gap_resp(g) for g in result.recommended_gaps],
-        bonus_gaps=[_gap_resp(g) for g in result.bonus_gaps],
-        matched_skills=result.matched_skills,
-        match_percentage=result.match_percentage,
-        total_potential_score_gain=result.total_potential_score_gain,
-        top_3_highest_impact_gaps=[_gap_resp(g) for g in result.top_3_highest_impact_gaps],
-        quick_wins=result.quick_wins,
-        short_term=result.short_term,
-        long_term=result.long_term,
-    )
-
-
-# ── Version History ─────────────────────────────────────────────────────
+# ── Version History ───────────────────────────────────────────────────────
 
 
 class ResumeVersionResponse(BaseModel):
@@ -717,8 +684,9 @@ class ImprovementTrendResponse(BaseModel):
 
 
 @router.get("/{resume_id}/versions", response_model=list[ResumeVersionResponse])
-async def get_versions(resume_id: str):
+async def get_versions(resume_id: str, user_id: str = Depends(get_current_user_id)):
     """Get all saved versions of a resume with their scores."""
+    load_user_resume(resume_id, user_id)  # ownership check
     from backend.memory.version_store import version_store
     versions = version_store.get_versions(resume_id)
     return [
@@ -736,8 +704,9 @@ async def get_versions(resume_id: str):
 
 
 @router.get("/{resume_id}/versions/trend", response_model=ImprovementTrendResponse)
-async def get_version_trend(resume_id: str):
+async def get_version_trend(resume_id: str, user_id: str = Depends(get_current_user_id)):
     """Get improvement trend data for a resume's version history."""
+    load_user_resume(resume_id, user_id)  # ownership check
     from backend.memory.version_store import version_store
     trend = version_store.get_improvement_trend(resume_id)
     return ImprovementTrendResponse(
@@ -748,40 +717,33 @@ async def get_version_trend(resume_id: str):
 
 
 @router.get("/{resume_id}/score/{jd_id}")
-async def get_cached_score(resume_id: str, jd_id: str):
+async def get_cached_score(
+    resume_id: str,
+    jd_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
     """Get a previously computed score. Returns 404 if not cached."""
-    if resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
+    resume = load_user_resume(resume_id, user_id)
     if jd_id not in _jd_store:
         raise HTTPException(404, "JD not found — score first using POST /{resume_id}/score")
 
-    resume = _resume_store[resume_id]
     jd = _jd_store[jd_id]
-
     from backend.agents.tailor.weightage.scorer_engine import score_resume
-
     result = await score_resume(resume, jd)
+
     return ScoreResponse(
-        total_score=result.total_score,
-        letter_grade=result.letter_grade,
+        total_score=result.total_score, letter_grade=result.letter_grade,
         dimension_scores=[
             DimensionScoreResponse(
-                dimension_id=d.dimension_id,
-                dimension_name=d.dimension_name,
-                raw_score=d.raw_score,
-                weighted_score=d.weighted_score,
-                weight=d.weight,
-                explanation=d.explanation,
-                issues=d.issues,
-                suggestions=d.suggestions,
-                priority=d.priority,
+                dimension_id=d.dimension_id, dimension_name=d.dimension_name,
+                raw_score=d.raw_score, weighted_score=d.weighted_score,
+                weight=d.weight, explanation=d.explanation,
+                issues=d.issues, suggestions=d.suggestions, priority=d.priority,
             )
             for d in result.dimension_scores
         ],
-        top_3_issues=result.top_3_issues,
-        top_3_wins=result.top_3_wins,
+        top_3_issues=result.top_3_issues, top_3_wins=result.top_3_wins,
         predicted_ats_pass=result.predicted_ats_pass,
-        role_type=result.role_type,
-        seniority_level=result.seniority_level,
+        role_type=result.role_type, seniority_level=result.seniority_level,
         weights_used=result.weights_used,
     )

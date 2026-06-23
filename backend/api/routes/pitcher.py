@@ -2,16 +2,15 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from backend.auth_deps import get_current_user_id
 from backend.parsers.jd_parser import parse_jd
 from backend.parsers.schemas import Resume
+from backend.api.routes.resume import load_user_resume
 
 router = APIRouter()
-
-# Re-use the resume store from the resume routes
-from backend.api.routes.resume import _resume_store
 
 
 # ── Request / Response Models ──────────────────────────────────────────────
@@ -69,12 +68,12 @@ class PitcherResponse(BaseModel):
 
 
 @router.post("/generate", response_model=PitcherResponse)
-async def generate_cover_letter(request: GenerateLetterRequest):
+async def generate_cover_letter(
+    request: GenerateLetterRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Generate a personalized cover letter for a resume + JD."""
-    if request.resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found — upload a resume first")
-
-    resume = _resume_store[request.resume_id]
+    resume = load_user_resume(request.resume_id, user_id)
     jd = parse_jd(request.jd_text)
 
     from backend.agents.pitcher.agent import PitcherAgent

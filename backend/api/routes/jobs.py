@@ -93,8 +93,8 @@ async def search_live_jobs(
     resume = None
     if request.resume_id:
         try:
-            from backend.api.routes.resume import _resume_store
-            resume = _resume_store.get(request.resume_id)
+            from backend.api.routes.resume import load_user_resume
+            resume = load_user_resume(request.resume_id, user_id)
         except Exception:
             pass
 

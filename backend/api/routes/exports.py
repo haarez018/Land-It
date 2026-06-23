@@ -30,17 +30,17 @@ class CoachingReportRequest(BaseModel):
 
 
 @router.post("/score-report")
-async def export_score_report(request: ScoreReportRequest):
+async def export_score_report(
+    request: ScoreReportRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Generate a 22-dimension score report as PDF/HTML."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.parsers.jd_parser import parse_jd
     from backend.agents.tailor.agent import TailorAgent
     from backend.utils.proof_exporter import generate_score_report
 
-    if request.resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
-
-    resume = _resume_store[request.resume_id]
+    resume = load_user_resume(request.resume_id, user_id)
     jd = parse_jd(request.jd_text)
 
     agent = TailorAgent()
@@ -62,17 +62,17 @@ async def export_score_report(request: ScoreReportRequest):
 
 
 @router.post("/diff-report")
-async def export_diff_report(request: DiffReportRequest):
+async def export_diff_report(
+    request: DiffReportRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Generate a tailoring diff report as PDF/HTML."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.parsers.jd_parser import parse_jd
     from backend.agents.tailor.agent import TailorAgent
     from backend.utils.proof_exporter import generate_diff_report
 
-    if request.resume_id not in _resume_store:
-        raise HTTPException(404, "Resume not found")
-
-    resume = _resume_store[request.resume_id]
+    resume = load_user_resume(request.resume_id, user_id)
     jd = parse_jd(request.jd_text)
 
     agent = TailorAgent()

@@ -6,7 +6,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from backend.auth_deps import get_current_user_id
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -104,6 +105,7 @@ async def create_profile(request: ProfileRequest):
 @router.post("/resume")
 async def upload_resume(
     file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Step 1: Upload resume as PDF or DOCX. Parses and stores it."""
     import tempfile
@@ -132,9 +134,8 @@ async def upload_resume(
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
-    # Store in the resume store for reuse
-    from backend.api.routes.resume import _resume_store
-    _resume_store[resume.id] = resume
+    from backend.api.routes.resume import save_user_resume
+    save_user_resume(resume, user_id, filename=file.filename or "")
     p.resume_id = resume.id
     p._steps_done.add("resume")
 
@@ -185,18 +186,21 @@ async def submit_writing_samples(request: WritingSamplesRequest):
 
 
 @router.post("/baseline-score")
-async def run_baseline_score(request: BaselineRequest):
+async def run_baseline_score(
+    request: BaselineRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     """Step 4: Score resume against a generic JD for baseline."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.agents.tailor.agent import TailorAgent
     from backend.agents.tailor.generic_jds import get_generic_jd
 
     p = _get_or_create_profile()
 
-    if not p.resume_id or p.resume_id not in _resume_store:
+    if not p.resume_id:
         raise HTTPException(400, "Upload a resume first (step 1)")
 
-    resume = _resume_store[p.resume_id]
+    resume = load_user_resume(p.resume_id, user_id)
 
     role_type = request.role_type or (p.target_roles[0] if p.target_roles else "software_engineer_backend")
     seniority = p.target_seniority or resume.seniority_level

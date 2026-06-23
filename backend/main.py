@@ -172,21 +172,14 @@ async def get_dimension_heatmap():
 
 
 @app.post("/api/salary/estimate", tags=["Salary Intelligence"])
-async def salary_estimate(request: SalaryEstimateRequest):
+async def salary_estimate(request: SalaryEstimateRequest, user_id: str = Depends(get_current_user_id)):
     """Estimate salary range for a resume + JD combination."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.parsers.jd_parser import parse_jd
     from backend.agents.scout.salary_intel import estimate_salary
 
-    resume_id = request.resume_id
-    jd_text = request.jd_text
-
-    if resume_id not in _resume_store:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Resume not found")
-
-    resume = _resume_store[resume_id]
-    jd = parse_jd(jd_text)
+    resume = load_user_resume(request.resume_id, user_id)
+    jd = parse_jd(request.jd_text)
 
     result = estimate_salary(resume, jd)
     return {
@@ -228,14 +221,11 @@ async def salary_locations():
 
 
 @app.post("/api/resume/{resume_id}/bias-check", tags=["Bias Detection"])
-async def bias_check(resume_id: str):
+async def bias_check(resume_id: str, user_id: str = Depends(get_current_user_id)):
     """Scan resume for gendered, age, cultural, and disability bias signals."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.agents.tailor.bias_detector import detect_bias
-    if resume_id not in _resume_store:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Resume not found")
-    report = detect_bias(_resume_store[resume_id])
+    report = detect_bias(load_user_resume(resume_id, user_id))
     return {
         "total_flags": report.total_flags, "bias_free_score": report.bias_free_score,
         "gendered_flags": report.gendered_flags, "age_flags": report.age_flags,
@@ -247,14 +237,11 @@ async def bias_check(resume_id: str):
 
 
 @app.post("/api/resume/{resume_id}/ats-optimize", tags=["ATS Systems"])
-async def ats_optimize(resume_id: str, request: AtsOptimizeRequest):
+async def ats_optimize(resume_id: str, request: AtsOptimizeRequest, user_id: str = Depends(get_current_user_id)):
     """Get ATS-specific recommendations for a resume + company combo."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.agents.tailor.ats_systems import get_ats_recommendations
-    if resume_id not in _resume_store:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Resume not found")
-    return get_ats_recommendations(_resume_store[resume_id], request.company)
+    return get_ats_recommendations(load_user_resume(resume_id, user_id), request.company)
 
 
 @app.get("/api/ats-systems", tags=["ATS Systems"])
@@ -309,14 +296,11 @@ async def match_story(request: MatchStoryRequest):
 
 
 @app.post("/api/career/simulate/{resume_id}", tags=["Career Simulator"])
-async def simulate_career(resume_id: str):
+async def simulate_career(resume_id: str, user_id: str = Depends(get_current_user_id)):
     """Simulate 3-track career path based on current resume."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.agents.planner.career_simulator import simulate_career as _sim
-    if resume_id not in _resume_store:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Resume not found")
-    result = _sim(_resume_store[resume_id])
+    result = _sim(load_user_resume(resume_id, user_id))
     return {
         "recommended_path": result.recommended_path, "reasoning": result.reasoning,
         "likely_title_2yr": result.likely_title_2yr, "likely_salary_2yr": list(result.likely_salary_2yr),
@@ -341,29 +325,23 @@ async def market_trends(role_type: str):
 
 
 @app.get("/api/market/fit/{resume_id}/{role_type}", tags=["Market Trends"])
-async def market_fit(resume_id: str, role_type: str):
+async def market_fit(resume_id: str, role_type: str, user_id: str = Depends(get_current_user_id)):
     """Compare user's skills against market trends."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.agents.scout.market_trends import get_user_market_fit
-    if resume_id not in _resume_store:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Resume not found")
-    fit = get_user_market_fit(_resume_store[resume_id], role_type)
+    fit = get_user_market_fit(load_user_resume(resume_id, user_id), role_type)
     return {"market_fit_score": fit.market_fit_score, "hot_skills_you_have": fit.hot_skills_you_have,
             "hot_skills_you_lack": fit.hot_skills_you_lack, "declining_skills_you_have": fit.declining_skills_you_have,
             "advice": fit.advice}
 
 
 @app.post("/api/pitcher/outreach", tags=["Cold Outreach"])
-async def generate_outreach_endpoint(request: OutreachRequest):
+async def generate_outreach_endpoint(request: OutreachRequest, user_id: str = Depends(get_current_user_id)):
     """Generate personalized cold outreach messages."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.agents.pitcher.outreach_generator import generate_outreach
-    if request.resume_id not in _resume_store:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Resume not found")
     msg = generate_outreach(
-        _resume_store[request.resume_id], request.company, request.role,
+        load_user_resume(request.resume_id, user_id), request.company, request.role,
         request.channel, request.recipient_type,
     )
     return {"channel": msg.channel, "recipient_type": msg.recipient_type,
@@ -371,14 +349,11 @@ async def generate_outreach_endpoint(request: OutreachRequest):
 
 
 @app.post("/api/resume/{resume_id}/format", tags=["Multi-Format"])
-async def format_resume(resume_id: str, request: FormatResumeRequest):
+async def format_resume(resume_id: str, request: FormatResumeRequest, user_id: str = Depends(get_current_user_id)):
     """Generate resume in a specific format (standard, LinkedIn, one-page, technical CV, portfolio)."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.agents.tailor.format_generator import generate_format
-    if resume_id not in _resume_store:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Resume not found")
-    result = generate_format(_resume_store[resume_id], request.format_type)
+    result = generate_format(load_user_resume(resume_id, user_id), request.format_type)
     return {"format_type": result.format_type, "format_name": result.format_name,
             "content": result.content, "word_count": result.word_count, "sections": result.sections}
 
@@ -394,28 +369,22 @@ async def timing_recommend(request: TimingRequest):
 
 
 @app.post("/api/resume/{resume_id}/freshness", tags=["Freshness Decay"])
-async def freshness_check(resume_id: str):
+async def freshness_check(resume_id: str, user_id: str = Depends(get_current_user_id)):
     """Score how fresh and current a resume is."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.agents.tailor.freshness import analyze_freshness
-    if resume_id not in _resume_store:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Resume not found")
-    report = analyze_freshness(_resume_store[resume_id])
+    report = analyze_freshness(load_user_resume(resume_id, user_id))
     return {"freshness_score": report.freshness_score, "decay_factors": report.decay_factors,
             "stale_sections": report.stale_sections, "last_role_recency": report.last_role_recency,
             "skills_currency": report.skills_currency, "refresh_suggestions": report.refresh_suggestions}
 
 
 @app.post("/api/resume/{resume_id}/consistency", tags=["Consistency"])
-async def consistency_check(resume_id: str):
+async def consistency_check(resume_id: str, user_id: str = Depends(get_current_user_id)):
     """Check resume for internal contradictions and inconsistencies."""
-    from backend.api.routes.resume import _resume_store
+    from backend.api.routes.resume import load_user_resume
     from backend.agents.tailor.consistency_checker import check_consistency
-    if resume_id not in _resume_store:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Resume not found")
-    issues = check_consistency(_resume_store[resume_id])
+    issues = check_consistency(load_user_resume(resume_id, user_id))
     return [{"type": i.type, "severity": i.severity, "description": i.description,
              "suggestion": i.suggestion} for i in issues]
 
