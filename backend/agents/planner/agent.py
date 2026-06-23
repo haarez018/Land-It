@@ -20,7 +20,6 @@ from backend.agents.planner.strategy import (
     generate_agent_tasks,
     generate_weekly_report,
     generate_weekly_report_ai,
-    list_applications,
     get_goal,
     store_report,
 )
@@ -55,7 +54,7 @@ class PlannerAgent:
         resume: Resume = state.get("resume")
         action = state.get("action", "plan")
 
-        applications = state.get("applications") or list_applications()
+        applications = state.get("applications") or []
         goal = state.get("goal") or get_goal()
 
         if action == "plan":

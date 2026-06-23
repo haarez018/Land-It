@@ -14,13 +14,7 @@ from datetime import datetime, UTC
 from typing import Optional
 
 from backend.parsers.schemas import JobDescription
-from backend.agents.planner.strategy import (
-    ApplicationEntry,
-    get_application,
-    list_applications,
-    store_application,
-    update_application_status,
-)
+from backend.agents.planner.strategy import ApplicationEntry
 from backend.agents.tracker.followup_scheduler import (
     FollowUp,
     FollowUpSchedule,
@@ -162,7 +156,7 @@ class TrackerAgent:
         Returns:
             TrackerResult with due follow-ups and generated email drafts
         """
-        apps = list_applications()
+        apps: list[ApplicationEntry] = []
         result = TrackerResult()
 
         for app in apps:
@@ -231,42 +225,24 @@ class TrackerAgent:
         application_id: str,
         new_status: str,
         reason: str = "",
+        old_status: str = "",
     ) -> TrackerResult:
         """
-        Transition an application to a new status with validation.
+        Record a status transition timeline event.
+        Validation and DB update are handled by the route layer.
 
         Args:
-            application_id: The application to transition
+            application_id: The application being transitioned
             new_status: Target status
             reason: Optional reason for the transition
+            old_status: Previous status (passed in from route)
 
         Returns:
             TrackerResult with timeline events
         """
         result = TrackerResult()
-
-        app = get_application(application_id)
-        if not app:
-            return result
-
-        old_status = app.status
-
-        # Validate transition
-        valid_next = VALID_TRANSITIONS.get(old_status, set())
-        if new_status not in valid_next:
-            event = TimelineEvent(
-                application_id=application_id,
-                event_type="error",
-                description=f"Invalid transition: {old_status} → {new_status}",
-            )
-            result.timeline_events.append(event)
-            return result
-
-        # Apply transition
-        update_application_status(application_id, new_status)
         result.applications_updated = 1
 
-        # Record timeline event
         event = TimelineEvent(
             application_id=application_id,
             event_type="status_change",
@@ -276,10 +252,6 @@ class TrackerAgent:
         )
         store_timeline_event(event)
         result.timeline_events.append(event)
-
-        # Auto-record submission timestamp
-        if new_status == "submitted" and not app.submitted_at:
-            app.submitted_at = datetime.now(UTC).isoformat()
 
         # Cancel follow-ups if moving to terminal state
         if new_status in ("interviewing", "phone_screen", "offer", "rejected", "withdrawn"):

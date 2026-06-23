@@ -101,10 +101,11 @@ async def transition_application(
             f"Valid transitions: {sorted(valid_next)}",
         )
 
-    result = await _agent.transition_status(app_id, request.new_status, request.reason)
-
-    # Persist the new status to DB
+    # Persist new status to DB first, then record timeline event in agent
     get_db().table("applications").update({"status": request.new_status}).eq("id", app_id).execute()
+    result = await _agent.transition_status(
+        app_id, request.new_status, request.reason, old_status=app["status"]
+    )
 
     return {
         "status": "transitioned",

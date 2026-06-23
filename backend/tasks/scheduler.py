@@ -67,12 +67,30 @@ def cron_matches(cron_expr: str, dt: datetime) -> bool:
 async def run_weekly_planner() -> dict:
     """Execute the Planner agent's weekly planning pipeline."""
     from backend.agents.planner.agent import PlannerAgent
-    from backend.agents.planner.strategy import list_applications, get_goal
+    from backend.agents.planner.strategy import ApplicationEntry, get_goal
 
     logger.info("⏰ Weekly planner job started")
 
+    # Fetch all applications from Supabase (across all users) for global report
+    try:
+        from backend.db import get_db
+        rows = get_db().table("applications").select("*").execute().data
+        apps = [
+            ApplicationEntry(
+                id=r["id"], job_id=r["job_id"], status=r.get("status", "submitted"),
+                fit_score=r.get("fit_score") or 0.0,
+                ats_score_before=r.get("ats_score_before"),
+                ats_score_after=r.get("ats_score_after"),
+                priority=r.get("priority") or 0,
+                submitted_at=r.get("submitted_at"),
+                notes=r.get("notes") or "",
+            )
+            for r in rows
+        ]
+    except Exception:
+        apps = []
+
     agent = PlannerAgent()
-    apps = list_applications()
     goal = get_goal()
 
     result = await agent.plan_week(apps, goal)
