@@ -7,8 +7,10 @@ Stack: **Supabase** (DB + Auth) · **Render** (backend) · **Vercel** (frontend)
 ## Step 1 — Supabase setup (5 min)
 
 1. Go to https://supabase.com and create a free account + new project.
-2. In the SQL editor (left sidebar), paste and run the entire file:
-   `supabase/migrations/001_initial.sql`
+2. In the SQL editor (left sidebar), paste and run **each migration in order**:
+   - `supabase/migrations/001_initial.sql` — core tables (profiles, jobs, applications)
+   - `supabase/migrations/002_applications_extended.sql` — adds ATS score + priority columns
+   - `supabase/migrations/003_resumes.sql` — creates the resumes table
 3. Go to **Settings → API** and copy:
    - Project URL → `SUPABASE_URL`
    - `anon` public key → `SUPABASE_ANON_KEY`
