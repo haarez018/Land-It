@@ -48,3 +48,6 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Claude Code (local AI dev tooling — never commit)
+.claude/
