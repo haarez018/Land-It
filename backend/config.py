@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: Optional[str] = None
     SUPABASE_SERVICE_KEY: Optional[str] = None
 
+    # Lemma Pod
+    LEMMA_TOKEN: Optional[str] = None
+    LEMMA_POD_ID: Optional[str] = None
+
     # Redis (for Celery)
     REDIS_URL: str = "redis://localhost:6379/0"
 

@@ -23,3 +23,9 @@ supabase>=2.9.0
 
 # HTTP client (scrapers, outreach)
 httpx>=0.27.0
+
+# Rate limiting
+slowapi>=0.1.9
+
+# Lemma SDK
+lemma-sdk>=0.5.3
