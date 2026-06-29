@@ -59,6 +59,24 @@ export default function Layout({ children }: LayoutProps) {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
+  // Sync activeAgentId with route path
+  useEffect(() => {
+    const pathToAgent: Record<string, string> = {
+      "/jobs": "scout",
+      "/tailor": "tailor",
+      "/pitcher": "pitcher",
+      "/coach": "coach",
+      "/tracker": "tracker",
+      "/planner": "planner",
+    };
+    const agentId = pathToAgent[location.pathname];
+    if (agentId) {
+      setActiveAgent(agentId);
+    } else if (location.pathname === "/" || location.pathname === "/pipeline") {
+      setActiveAgent(null);
+    }
+  }, [location.pathname, setActiveAgent]);
+
   const handleAgentClick = useCallback(
     (agentId: string) => {
       setActiveAgent(agentId);
@@ -77,18 +95,6 @@ export default function Layout({ children }: LayoutProps) {
     [setActiveAgent, navigate]
   );
 
-  const handleQuickAction = useCallback(
-    (action: string) => {
-      const routes: Record<string, string> = {
-        discover: "/jobs",
-        tailor: "/tailor",
-        coach: "/coach",
-        pitcher: "/pitcher",
-      };
-      if (routes[action]) navigate(routes[action]);
-    },
-    [navigate]
-  );
 
   const handleCommand = useCallback(
     (action: string, arg?: string) => {
@@ -147,7 +153,6 @@ export default function Layout({ children }: LayoutProps) {
         <LeftRail
           activeFilter={activeFilter}
           onFilterChange={handleFilterChange}
-          onQuickAction={handleQuickAction}
         />
         
         {/* Replaced fixed CenterStage component with glassy wrapper for children routes */}

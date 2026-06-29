@@ -1,19 +1,13 @@
-import { Search, Scissors, Mic, Mail } from "lucide-react";
+import { Radio, History } from "lucide-react";
 import { motion } from "framer-motion";
 import { DEMO_APPLICATIONS } from "../../lib/demoData";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useAgentStore } from "../../store/useAgentStore";
 
 type PipelineStatus = "Discovered" | "Tailored" | "Applied" | "Interviewing" | "Closed";
 
 const PIPELINE_STATUSES: PipelineStatus[] = [
   "Discovered", "Tailored", "Applied", "Interviewing", "Closed",
-];
-
-const QUICK_ACTIONS = [
-  { label: "Discover Jobs", icon: Search, action: "discover" },
-  { label: "Tailor a Resume", icon: Scissors, action: "tailor" },
-  { label: "Mock Interview", icon: Mic, action: "coach" },
-  { label: "Write Cover Letter", icon: Mail, action: "pitcher" },
 ];
 
 const STATUS_DOT_COLORS: Record<PipelineStatus, string> = {
@@ -27,12 +21,12 @@ const STATUS_DOT_COLORS: Record<PipelineStatus, string> = {
 interface LeftRailProps {
   activeFilter: PipelineStatus | null;
   onFilterChange: (status: PipelineStatus | null) => void;
-  onQuickAction: (action: string) => void;
 }
 
-export default function LeftRail({ activeFilter, onFilterChange, onQuickAction }: LeftRailProps) {
+export default function LeftRail({ activeFilter, onFilterChange }: LeftRailProps) {
   const theme = useThemeStore((s) => s.theme);
   const isDark = theme === "dark";
+  const agents = useAgentStore((s) => s.agents);
 
   const counts = PIPELINE_STATUSES.reduce<Record<PipelineStatus, number>>(
     (acc, s) => { acc[s] = DEMO_APPLICATIONS.filter((a) => a.status === s).length; return acc; },
@@ -53,6 +47,15 @@ export default function LeftRail({ activeFilter, onFilterChange, onQuickAction }
   const textMute = isDark ? "#475569" : "#94a3b8";
   const hoverBg = isDark ? "hover:bg-white/[0.06]" : "hover:bg-black/[0.04]";
   const dividerColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+
+  const recentActivities = agents
+    .map((agent) => ({
+      id: agent.id,
+      title: agent.name,
+      desc: agent.lastOutput,
+      time: "Active",
+    }))
+    .slice(0, 4);
 
   return (
     <aside
@@ -122,43 +125,82 @@ export default function LeftRail({ activeFilter, onFilterChange, onQuickAction }
       {/* Divider */}
       <div className="mx-4 my-4" style={{ borderTop: `1px solid ${dividerColor}` }} />
 
-      {/* Quick actions */}
+      {/* Lemma Pod Connection Status */}
       <div className="px-4">
         <p className="font-mono text-[10px] uppercase tracking-wider mb-3" style={{ color: textMute }}>
-          Quick Actions
+          Pod Connection
         </p>
-        <div className="space-y-0.5">
-          {QUICK_ACTIONS.map(({ label, icon: Icon, action }) => (
-            <motion.button
-              key={action}
-              id={`cockpit-action-${action}`}
-              whileHover={{ x: 2 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onQuickAction(action)}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3 h-9 text-left transition-all ${hoverBg}`}
-            >
-              <Icon size={14} strokeWidth={1.5} style={{ color: textMute }} />
-              <span className="font-sans text-xs" style={{ color: textDim }}>{label}</span>
-            </motion.button>
-          ))}
+
+        <div
+          className="rounded-xl p-3 border transition-all"
+          style={{
+            backgroundColor: isDark ? "rgba(138,43,226,0.04)" : "rgba(138,43,226,0.02)",
+            borderColor: isDark ? "rgba(138,43,226,0.15)" : "rgba(138,43,226,0.1)",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Radio size={14} className="animate-pulse shrink-0" style={{ color: "#00F5A0" }} />
+            <span className="font-sans text-xs font-semibold truncate" style={{ color: textPrimary }}>
+              land-it-mission-control
+            </span>
+          </div>
+
+          <div className="space-y-1 text-[11px] font-mono" style={{ color: textDim }}>
+            <div className="flex justify-between">
+              <span>Status:</span>
+              <span className="flex items-center gap-1 font-semibold" style={{ color: "#00F5A0" }}>
+                Connected
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>ID:</span>
+              <span className="text-[10px] opacity-80" title="019f1286-4259-72fe-8f28-b43a4a567390">
+                019f1286...
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Org:</span>
+              <span className="text-[10px] opacity-80 truncate max-w-[100px]">
+                Haarez_018
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Engine:</span>
+              <span className="text-[10px] opacity-80">
+                lemma-sdk
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1" />
+      {/* Divider */}
+      <div className="mx-4 my-4" style={{ borderTop: `1px solid ${dividerColor}` }} />
 
-      {/* Lemma pod */}
-      <div
-        className="px-4 py-3 mx-2 mb-2 rounded-xl"
-        style={{
-          background: isDark ? "rgba(138,43,226,0.08)" : "rgba(138,43,226,0.06)",
-          border: "1px solid rgba(138,43,226,0.2)",
-        }}
-      >
-        <p className="font-mono text-[10px] leading-relaxed" style={{ color: textMute }}>
-          pod: mission-control
-          <br />
-          <span style={{ color: "#00F5A0" }}>●</span> synced 2s ago
+      {/* Recent Activity Section */}
+      <div className="px-4 pb-4">
+        <p className="font-mono text-[10px] uppercase tracking-wider mb-3 flex items-center gap-1.5" style={{ color: textMute }}>
+          <History size={11} className="shrink-0" />
+          Recent Activity
         </p>
+
+        <div className="space-y-3">
+          {recentActivities.map((act) => (
+            <div key={act.id} className="text-[11px] leading-snug">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="font-semibold uppercase tracking-wider font-mono text-[9px]" style={{ color: "#00F5A0" }}>
+                  {act.title}
+                </span>
+                <span className="font-mono text-[9px] opacity-50" style={{ color: textMute }}>
+                  {act.time}
+                </span>
+              </div>
+              <p className="line-clamp-2" style={{ color: textDim }}>
+                {act.desc}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </aside>
   );
