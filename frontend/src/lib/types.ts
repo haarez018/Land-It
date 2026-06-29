@@ -242,6 +242,28 @@ export interface ABTestResult {
   seniority_level: string;
 }
 
+// ── Calibration types ─────────────────────────────────────────────────────
+
+export interface CalibrationBucket {
+  range_low: number;
+  range_high: number;
+  predicted_count: number;
+  actual_callbacks: number;
+  actual_rate: number;
+}
+
+export interface CalibrationDashboard {
+  overall_brier: number;
+  sharpness: number;
+  n_resolved: number;
+  accuracy: number;
+  predicted_callbacks: number;
+  actual_callbacks: number;
+  calibration_buckets: CalibrationBucket[];
+  is_well_calibrated: boolean;
+  interpretation: string;
+}
+
 // ── Analytics types ───────────────────────────────────────────────────────
 
 export interface FunnelMetrics {

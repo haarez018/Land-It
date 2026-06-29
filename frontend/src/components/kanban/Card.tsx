@@ -27,12 +27,12 @@ export default function Card({ application, onSelect }: Props) {
   return (
     <div
       onClick={() => onSelect?.(application.id)}
-      className={`cursor-pointer rounded-lg border border-[var(--border-primary)] border-l-4 bg-[var(--bg-card)] p-3 transition-all hover:bg-[var(--bg-card-hover)] hover:shadow-md ${
-        STATUS_ACCENT[status] || "border-l-navy-600"
+      className={`cursor-pointer rounded-xl border border-white/10 border-l-4 bg-white/5 p-3 backdrop-blur-md transition-all hover:border-[#00F5A0] hover:shadow-lg ${
+        STATUS_ACCENT[status] || "border-l-[#475569]"
       }`}
     >
       {/* Company + Title */}
-      <p className="text-xs font-medium text-amber-400">
+      <p className="text-xs font-medium text-[#00F5A0]">
         {job.company || "Unknown Company"}
       </p>
       <p className="mt-0.5 text-sm font-semibold text-theme line-clamp-1">
@@ -72,7 +72,7 @@ export default function Card({ application, onSelect }: Props) {
           {Array.from({ length: application.planner_priority }).map((_, i) => (
             <div
               key={i}
-              className="h-1.5 w-1.5 rounded-full bg-amber-500"
+              className="h-1.5 w-1.5 rounded-full bg-[#00F5A0]"
             />
           ))}
           <span className="ml-1 text-[9px] text-muted-theme">priority</span>

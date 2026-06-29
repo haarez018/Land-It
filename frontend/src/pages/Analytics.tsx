@@ -10,8 +10,18 @@
  */
 
 import { useEffect, useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import api from "../lib/api";
-import type { JobSearchAnalytics } from "../lib/types";
+import type { CalibrationDashboard, JobSearchAnalytics } from "../lib/types";
 
 function FunnelBar({
   label,
@@ -77,6 +87,7 @@ function HeatCell({ score }: { score: number }) {
 
 export default function Analytics() {
   const [analytics, setAnalytics] = useState<JobSearchAnalytics | null>(null);
+  const [calibration, setCalibration] = useState<CalibrationDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [clickedApply, setClickedApply] = useState(0);
 
@@ -89,6 +100,10 @@ export default function Analytics() {
     api
       .get<{ count: number }>("/jobs/apply-clicks")
       .then((r) => setClickedApply(r.data.count))
+      .catch(() => {});
+    api
+      .get<CalibrationDashboard>("/calibration")
+      .then((r) => setCalibration(r.data))
       .catch(() => {});
   }, []);
 
@@ -117,15 +132,21 @@ export default function Analytics() {
   return (
     <div className="mx-auto max-w-4xl space-y-8 p-6">
       {/* 1. Summary */}
-      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-6">
+      <div
+        className="glass-card p-6 border rounded-2xl shadow-lg backdrop-blur-xl"
+        style={{
+          borderColor: "rgba(0,245,160,0.25)",
+          backgroundColor: "rgba(0,245,160,0.06)",
+        }}
+      >
         <p className="text-lg font-semibold leading-relaxed text-theme">
           {analytics.one_sentence_summary}
         </p>
       </div>
 
       {/* 2. Funnel */}
-      <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-6">
-        <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-muted-theme">
+      <div className="glass-card p-6 backdrop-blur-xl rounded-2xl shadow-lg border border-white/10">
+        <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-theme">
           Application Funnel
         </h2>
         <div className="space-y-3">
@@ -146,7 +167,7 @@ export default function Analytics() {
 
       {/* 3. Score trend + Rejections + Clicked Apply */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5">
+        <div className="glass-card p-5 backdrop-blur-xl rounded-2xl shadow-md border border-white/10">
           <p className="text-xs font-bold uppercase text-muted-theme">Score Trend</p>
           <div className="mt-2 flex items-center gap-3">
             <span className={`text-2xl font-bold ${analytics.is_improving ? "text-emerald-400" : "text-theme-secondary"}`}>
@@ -157,20 +178,26 @@ export default function Analytics() {
             </span>
           </div>
         </div>
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5">
+        <div className="glass-card p-5 backdrop-blur-xl rounded-2xl shadow-md border border-white/10">
           <p className="text-xs font-bold uppercase text-muted-theme">Rejections</p>
           <p className="mt-2 text-2xl font-bold text-theme">{f.rejections}</p>
         </div>
-        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-5">
-          <p className="text-xs font-bold uppercase text-blue-400">Clicked Apply</p>
-          <p className="mt-2 text-2xl font-bold text-blue-400">{clickedApply}</p>
+        <div
+          className="glass-card p-5 backdrop-blur-xl rounded-2xl shadow-md border"
+          style={{
+            borderColor: "rgba(138,43,226,0.3)",
+            backgroundColor: "rgba(138,43,226,0.06)",
+          }}
+        >
+          <p className="text-xs font-bold uppercase text-cp-purple" style={{ color: "#8A2BE2" }}>Clicked Apply</p>
+          <p className="mt-2 text-2xl font-bold text-cp-purple" style={{ color: "#8A2BE2" }}>{clickedApply}</p>
           <p className="mt-1 text-[10px] text-muted-theme">distinct jobs</p>
         </div>
       </div>
 
       {/* 4. Dimension heatmap */}
       {dimEntries.length > 0 && (
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5">
+        <div className="glass-card p-5 backdrop-blur-xl rounded-2xl shadow-md border border-white/10">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-theme">
             Dimension Heatmap (weakest first)
           </h2>
@@ -178,7 +205,7 @@ export default function Analytics() {
             {dimEntries.map(([dim, score]) => (
               <div
                 key={dim}
-                className="flex items-center justify-between rounded-lg bg-[var(--bg-tertiary)] px-3 py-2"
+                className="flex items-center justify-between rounded-xl px-3 py-2 bg-white/5 border border-white/10"
               >
                 <span className="truncate text-xs text-theme-secondary">
                   {dim.replace(/_/g, " ")}
@@ -199,8 +226,8 @@ export default function Analytics() {
       )}
 
       {/* 5. Wins + Focus Areas */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="glass-card p-4 border border-emerald-500/10 bg-emerald-500/5 backdrop-blur-xl rounded-2xl">
           <p className="text-xs font-bold uppercase text-emerald-400">This Week's Wins</p>
           <ul className="mt-2 space-y-1 text-sm text-theme-secondary">
             {analytics.this_week_wins.length > 0 ? (
@@ -214,17 +241,101 @@ export default function Analytics() {
             )}
           </ul>
         </div>
-        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
-          <p className="text-xs font-bold uppercase text-amber-400">Focus Areas</p>
+        <div className="glass-card p-4 border border-cp-accent/25 bg-cp-accent/5 backdrop-blur-xl rounded-2xl">
+          <p className="text-xs font-bold uppercase text-cp-accent">Focus Areas</p>
           <ul className="mt-2 space-y-1 text-sm text-theme-secondary">
             {analytics.focus_areas.map((fa, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className="text-amber-400">!</span> {fa}
+                <span className="text-cp-accent">!</span> {fa}
               </li>
             ))}
           </ul>
         </div>
       </div>
+
+      {/* 6. Confidence Calibration */}
+      {calibration && (
+        <div className="glass-card p-6 backdrop-blur-xl rounded-2xl shadow-lg border border-white/10">
+          <div className="mb-4 flex items-start justify-between">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-theme">
+                Confidence Calibration
+              </h2>
+              <p className="mt-1 text-xs text-muted-theme">{calibration.interpretation}</p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-bold ${
+                calibration.is_well_calibrated
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : "bg-cp-accent/20 text-cp-accent"
+              }`}
+            >
+              {calibration.is_well_calibrated ? "Well-calibrated" : "Needs tuning"}
+            </span>
+          </div>
+
+          <div className="mb-4 grid grid-cols-3 gap-3">
+            <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-center">
+              <p className="text-xl font-bold text-theme">{calibration.overall_brier.toFixed(3)}</p>
+              <p className="text-[10px] text-muted-theme">Brier Score</p>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-center">
+              <p className="text-xl font-bold text-theme">{(calibration.accuracy * 100).toFixed(0)}%</p>
+              <p className="text-[10px] text-muted-theme">Accuracy</p>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-center">
+              <p className="text-xl font-bold text-theme">{calibration.n_resolved}</p>
+              <p className="text-[10px] text-muted-theme">Resolved Apps</p>
+            </div>
+          </div>
+
+          {calibration.calibration_buckets.length > 0 ? (
+            <div>
+              <p className="mb-2 text-xs text-muted-theme">Reliability diagram — perfect calibration follows the diagonal</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart
+                  data={[
+                    { predicted: 0, perfect: 0, actual: null },
+                    ...calibration.calibration_buckets.map((b) => ({
+                      predicted: Math.round(((b.range_low + b.range_high) / 2) * 100),
+                      actual: Math.round(b.actual_rate * 100),
+                      perfect: Math.round(((b.range_low + b.range_high) / 2) * 100),
+                    })),
+                    { predicted: 100, perfect: 100, actual: null },
+                  ]}
+                  margin={{ top: 4, right: 12, left: -12, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="predicted"
+                    tickFormatter={(v) => `${v}%`}
+                    tick={{ fontSize: 10, fill: "var(--text-muted)" }}
+                    label={{ value: "Predicted probability", position: "insideBottom", offset: -2, fontSize: 10, fill: "var(--text-muted)" }}
+                  />
+                  <YAxis
+                    tickFormatter={(v) => `${v}%`}
+                    tick={{ fontSize: 10, fill: "var(--text-muted)" }}
+                    domain={[0, 100]}
+                  />
+                  <Tooltip
+                    formatter={(v: number) => `${v}%`}
+                    contentStyle={{ background: "rgba(13,17,23,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 11 }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="perfect" stroke="#6b7280" strokeDasharray="4 4" dot={false} name="Perfect" strokeWidth={1} />
+                  <Line type="monotone" dataKey="actual" stroke="#00F5A0" strokeWidth={2} dot={{ r: 4, fill: "#00F5A0" }} name="Actual" connectNulls={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-center text-sm text-muted-theme py-8">
+              No resolved applications with callback predictions yet.
+              <br />
+              Set <code className="text-amber-400">callback_probability</code> on applications to track calibration.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

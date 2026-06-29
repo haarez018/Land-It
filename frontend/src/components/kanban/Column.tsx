@@ -31,16 +31,16 @@ export default function Column({
 }: Props) {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.currentTarget.classList.add("ring-2", "ring-amber-500/30");
+    e.currentTarget.classList.add("ring-2", "ring-[#00F5A0]/40");
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    e.currentTarget.classList.remove("ring-2", "ring-amber-500/30");
+    e.currentTarget.classList.remove("ring-2", "ring-[#00F5A0]/40");
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    e.currentTarget.classList.remove("ring-2", "ring-amber-500/30");
+    e.currentTarget.classList.remove("ring-2", "ring-[#00F5A0]/40");
     const appId = e.dataTransfer.getData("text/plain");
     if (appId && onDrop) {
       onDrop(appId, id);
@@ -52,19 +52,19 @@ export default function Column({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="flex min-w-[260px] flex-shrink-0 flex-col rounded-xl border border-navy-700 bg-navy-800 transition-all"
+      className="flex min-w-[260px] flex-shrink-0 flex-col rounded-2xl glass-card backdrop-blur-xl transition-all shadow-md"
     >
       {/* Column header */}
-      <div className="flex items-center justify-between border-b border-navy-700 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex items-center gap-2">
           <h3
             className={`text-sm font-semibold ${
-              COLUMN_COLORS[id] || "text-navy-300"
+              COLUMN_COLORS[id] || "text-cp-text-dim"
             }`}
           >
             {label}
           </h3>
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-navy-700 text-[10px] font-bold text-navy-400">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/5 text-[10px] font-bold text-cp-text-dim border border-white/10">
             {count}
           </span>
         </div>
@@ -85,7 +85,7 @@ export default function Column({
             </div>
           ))
         ) : (
-          <div className="rounded-lg border border-dashed border-navy-600 p-4 text-center text-xs text-navy-500">
+          <div className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-muted-theme bg-white/[0.01]">
             No applications
           </div>
         )}

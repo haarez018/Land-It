@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect } from "react";
 import { useTrackerStore } from "../store";
+import { useThemeStore } from "../store/useThemeStore";
 import type { ApplicationStatus } from "../lib/types";
 import Board from "../components/kanban/Board";
 
 export default function Tracker() {
+  const theme = useThemeStore((s) => s.theme);
+  const isDark = theme === "dark";
   const apps = useTrackerStore((s) => s.apps);
   const loading = useTrackerStore((s) => s.loading);
   const error = useTrackerStore((s) => s.error);
@@ -67,7 +70,7 @@ export default function Tracker() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-primary)] px-3 py-1 text-xs text-muted-theme">
+          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-muted-theme">
             {apps.length} total
           </span>
         </div>
@@ -123,15 +126,15 @@ export default function Tracker() {
           ].map((label) => (
             <div
               key={label}
-              className="min-w-[260px] flex-shrink-0 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)]"
+              className="min-w-[260px] flex-shrink-0 rounded-2xl glass-card backdrop-blur-xl border border-white/10"
             >
-              <div className="border-b border-[var(--border-primary)] px-4 py-3">
+              <div className="border-b border-white/10 px-4 py-3">
                 <h3 className="text-sm font-semibold text-theme-secondary">
                   {label}
                 </h3>
               </div>
               <div className="p-3">
-                <div className="rounded-lg border border-dashed border-[var(--border-primary)] p-4 text-center text-xs text-muted-theme">
+                <div className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-muted-theme bg-white/[0.01]">
                   No applications
                 </div>
               </div>
@@ -141,11 +144,16 @@ export default function Tracker() {
       )}
 
       {/* Help text */}
-      <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 text-center">
+      <div
+        className="glass-card p-4 border border-white/10 text-center rounded-2xl shadow-md backdrop-blur-xl"
+        style={{
+          backgroundColor: isDark ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.55)"
+        }}
+      >
         <p className="text-sm text-muted-theme">
           Applications flow through the pipeline automatically as you tailor
           resumes and submit them. Use the{" "}
-          <span className="font-semibold text-amber-500">Tailor</span> page to
+          <span className="font-semibold text-cp-accent">Tailor</span> page to
           score and optimize, then mark as submitted here.
         </p>
       </div>

@@ -5,8 +5,11 @@ import { useJobStore, useAppStore } from "../store";
 import type { JobDescription } from "../lib/types";
 import JDPaste from "../components/shared/JDPaste";
 import api from "../lib/api";
+import { useThemeStore } from "../store/useThemeStore";
 
 export default function Jobs() {
+  const theme     = useThemeStore((s) => s.theme);
+  const isDark    = theme === "dark";
   const jobs      = useJobStore((s) => s.jobs);
   const loading   = useJobStore((s) => s.loading);
   const storeErr  = useJobStore((s) => s.error);
@@ -80,10 +83,10 @@ export default function Jobs() {
       </div>
 
       {/* ── Live Search ── */}
-      <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-6">
+      <div className="glass-card p-6 backdrop-blur-xl shadow-lg rounded-2xl">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15">
-            <svg className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cp-accent/15">
+            <svg className="h-4 w-4 text-cp-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
             </svg>
           </span>
@@ -94,7 +97,7 @@ export default function Jobs() {
         </div>
         <p className="mt-1 text-xs text-muted-theme">
           Pulls real listings from Remotive &amp; Arbeitnow — remote-friendly tech roles.
-          {resume && <span className="ml-1 text-amber-400">Auto-scoring against your resume.</span>}
+          {resume && <span className="ml-1 text-cp-accent">Auto-scoring against your resume.</span>}
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -104,21 +107,31 @@ export default function Jobs() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             placeholder="Role / title  (e.g. Senior React Developer)"
-            className="flex-1 input-theme rounded-lg px-4 py-2 text-sm"
+            className="flex-1 rounded-xl px-4 py-2 text-sm font-mono outline-none transition-all"
+            style={{
+              backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
+              border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
+              color: isDark ? "#f0f4ff" : "#111827",
+            }}
           />
           <input
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="Location (optional)"
-            className="w-48 input-theme rounded-lg px-4 py-2 text-sm"
+            className="w-48 rounded-xl px-4 py-2 text-sm font-mono outline-none transition-all"
+            style={{
+              backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
+              border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
+              color: isDark ? "#f0f4ff" : "#111827",
+            }}
           />
           <label className="flex items-center gap-2 text-xs text-theme-secondary cursor-pointer select-none">
             <input
               type="checkbox"
               checked={remoteOnly}
               onChange={(e) => setRemoteOnly(e.target.checked)}
-              className="accent-amber-500 h-3.5 w-3.5"
+              className="accent-cp-accent h-3.5 w-3.5"
             />
             Remote only
           </label>
@@ -127,11 +140,14 @@ export default function Jobs() {
         <button
           onClick={handleSearch}
           disabled={!query.trim() || searching}
-          className={`mt-3 rounded-lg px-6 py-2 text-sm font-bold transition-colors ${
-            query.trim() && !searching
-              ? "bg-amber-500 text-white hover:bg-amber-400"
-              : "bg-[var(--bg-tertiary)] text-muted-theme cursor-not-allowed"
-          }`}
+          className="mt-3 text-xs font-semibold rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: query.trim() && !searching ? "linear-gradient(135deg, #00F5A0, #00c47f)" : undefined,
+            backgroundColor: !query.trim() || searching ? "rgba(255,255,255,0.05)" : undefined,
+            color: query.trim() && !searching ? "#060914" : "#4B5670",
+            padding: "8px 20px",
+            boxShadow: query.trim() && !searching ? "0 4px 14px rgba(0,245,160,0.3)" : undefined,
+          }}
         >
           {searching ? (
             <span className="flex items-center gap-2">
@@ -146,7 +162,7 @@ export default function Jobs() {
 
         {/* Result feedback */}
         {searchResult && (
-          <div className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-2">
+          <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-2">
             <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <polyline points="20 6 9 17 4 12" />
             </svg>
@@ -157,14 +173,14 @@ export default function Jobs() {
           </div>
         )}
         {searchErr && (
-          <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-red-400">
+          <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-red-400">
             {searchErr}
           </div>
         )}
       </div>
 
       {/* ── Manual Paste ── */}
-      <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-6">
+      <div className="glass-card p-6 backdrop-blur-xl shadow-lg rounded-2xl">
         <h2 className="text-lg font-semibold text-theme">Paste a Job Description</h2>
         <p className="mt-1 text-xs text-muted-theme">Have a specific role in mind? Paste the full JD and Scout will parse and score it.</p>
         <div className="mt-4">
@@ -176,32 +192,35 @@ export default function Jobs() {
         <button
           onClick={handleParse}
           disabled={!jdText.trim() || parseLoading}
-          className={`mt-4 rounded-lg px-6 py-2 text-sm font-semibold transition-colors ${
-            jdText.trim() && !parseLoading
-              ? "bg-amber-500 text-white hover:bg-amber-400"
-              : "bg-[var(--bg-tertiary)] text-muted-theme cursor-not-allowed"
-          }`}
+          className="mt-4 text-xs font-semibold rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: jdText.trim() && !parseLoading ? "linear-gradient(135deg, #00F5A0, #00c47f)" : undefined,
+            backgroundColor: !jdText.trim() || parseLoading ? "rgba(255,255,255,0.05)" : undefined,
+            color: jdText.trim() && !parseLoading ? "#060914" : "#4B5670",
+            padding: "8px 20px",
+            boxShadow: jdText.trim() && !parseLoading ? "0 4px 14px rgba(0,245,160,0.3)" : undefined,
+          }}
         >
           {parseLoading ? "Parsing..." : "Parse & Score"}
         </button>
       </div>
 
       {storeErr && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {storeErr}
         </div>
       )}
 
       {/* ── Queue ── */}
-      <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-6">
+      <div className="glass-card p-6 backdrop-blur-xl shadow-lg rounded-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-amber-500">Queue</h2>
+          <h2 className="text-lg font-semibold text-cp-accent">Queue</h2>
           <span className="text-xs text-muted-theme">{jobs.length} jobs</span>
         </div>
 
         {loading ? (
           <div className="mt-4 flex justify-center py-8">
-            <svg className="h-6 w-6 animate-spin text-amber-400" viewBox="0 0 24 24" fill="none">
+            <svg className="h-6 w-6 animate-spin text-cp-accent" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
               <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
             </svg>
@@ -302,8 +321,19 @@ function JobCard({
     );
   };
 
+  const theme = useThemeStore((s) => s.theme);
+  const isDark = theme === "dark";
+
   return (
-    <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 transition-all hover:border-[var(--border-hover)]">
+    <div
+      className="glass-card p-4 backdrop-blur-xl transition-all rounded-2xl"
+      style={{
+        backgroundColor: isDark ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.7)",
+        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#00F5A0"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = ""; }}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -371,17 +401,23 @@ function JobCard({
 
       {/* Primary actions */}
       <div className="mt-3 flex flex-wrap gap-2">
-        <a href={`/tailor?jd=${encodeURIComponent(job.raw_text.slice(0, 200))}`}
-          className="rounded bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-500 hover:bg-amber-500/20 transition-colors">
+        <a
+          href={`/tailor?jd=${encodeURIComponent(job.raw_text.slice(0, 200))}`}
+          className="rounded-xl border border-cp-accent/30 bg-cp-accent/5 px-3 py-1 text-xs font-semibold text-cp-accent transition-all hover:bg-cp-accent/15"
+        >
           Tailor Resume
         </a>
-        <a href={`/pitcher?jd=${encodeURIComponent(job.raw_text.slice(0, 200))}`}
-          className="rounded bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-colors">
+        <a
+          href={`/pitcher?jd=${encodeURIComponent(job.raw_text.slice(0, 200))}`}
+          className="rounded-xl border border-cp-accent/30 bg-cp-accent/5 px-3 py-1 text-xs font-semibold text-cp-accent transition-all hover:bg-cp-accent/15"
+        >
           Cover Letter
         </a>
         {applyUrl && (
-          <button onClick={handleApplyClick}
-            className="rounded bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-400 hover:bg-blue-500/20 transition-colors">
+          <button
+            onClick={handleApplyClick}
+            className="rounded-xl border border-cp-purple/30 bg-cp-purple/5 px-3 py-1 text-xs font-semibold text-cp-purple transition-all hover:bg-cp-purple/15"
+          >
             Apply ↗
           </button>
         )}
@@ -389,7 +425,7 @@ function JobCard({
           <button
             onClick={handleMarkApplied}
             disabled={applying}
-            className="rounded bg-[var(--bg-tertiary)] px-3 py-1 text-xs font-semibold text-muted-theme hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors disabled:opacity-50"
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-muted-theme transition-all hover:border-cp-accent hover:text-cp-accent disabled:opacity-50"
           >
             {applying ? "Saving..." : "Mark as Applied"}
           </button>

@@ -52,7 +52,7 @@ export default function Pitcher() {
       {/* Input section */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Resume upload */}
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-6">
+        <div className="glass-card p-6 backdrop-blur-xl shadow-lg rounded-2xl">
           <h2 className="text-lg font-semibold text-theme">Resume</h2>
           <div className="mt-4">
             <ResumeUpload
@@ -63,7 +63,7 @@ export default function Pitcher() {
           </div>
           {resume && (
             <div className="mt-3 text-xs text-muted-theme">
-              <span className="text-emerald-500">{resume.contact.name}</span>
+              <span className="text-emerald-400 font-medium">{resume.contact.name}</span>
               {" · "}
               {resume.total_yoe.toFixed(1)} YoE
               {" · "}
@@ -73,7 +73,7 @@ export default function Pitcher() {
         </div>
 
         {/* JD paste */}
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-6">
+        <div className="glass-card p-6 backdrop-blur-xl shadow-lg rounded-2xl">
           <h2 className="text-lg font-semibold text-theme">Job Description</h2>
           <div className="mt-4">
             <JDPaste value={jdText} onChange={setJdText} />
@@ -86,7 +86,7 @@ export default function Pitcher() {
         </div>
 
         {/* Writing samples */}
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-6">
+        <div className="glass-card p-6 backdrop-blur-xl shadow-lg rounded-2xl">
           <h2 className="mb-4 text-lg font-semibold text-theme">Voice Samples</h2>
           <WritingSamples samples={samples} onChange={setSamples} />
         </div>
@@ -96,11 +96,13 @@ export default function Pitcher() {
       <button
         onClick={handleGenerate}
         disabled={!canGenerate || loading}
-        className={`rounded-lg px-8 py-3 text-sm font-bold transition-colors ${
-          canGenerate && !loading
-            ? "bg-amber-500 text-white hover:bg-amber-400"
-            : "bg-[var(--bg-tertiary)] text-muted-theme cursor-not-allowed"
-        }`}
+        className={`px-8 py-3 text-sm font-bold transition-all rounded-xl cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+        style={{
+          background: canGenerate && !loading ? "linear-gradient(135deg, #00F5A0, #00c47f)" : undefined,
+          backgroundColor: !canGenerate || loading ? "rgba(255,255,255,0.05)" : undefined,
+          color: canGenerate && !loading ? "#060914" : "#4B5670",
+          boxShadow: canGenerate && !loading ? "0 4px 14px rgba(0,245,160,0.3)" : undefined,
+        }}
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -133,7 +135,7 @@ export default function Pitcher() {
 
       {/* Error */}
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {error}
         </div>
       )}
@@ -157,7 +159,7 @@ export default function Pitcher() {
 
       {/* Empty state */}
       {!result && !loading && (
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-6 text-center text-muted-theme">
+        <div className="glass-card p-8 text-center text-muted-theme backdrop-blur-xl rounded-2xl shadow-lg">
           Upload a resume and paste a JD to generate your personalized cover letter.
         </div>
       )}

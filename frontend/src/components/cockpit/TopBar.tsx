@@ -47,17 +47,20 @@ export default function TopBar({ onCommandPaletteOpen }: TopBarProps) {
       className={`flex h-12 shrink-0 items-center justify-between px-4 ${glassBase}`}
     >
       {/* Left: Logo */}
-      <div className="flex flex-col justify-center">
+      <a
+        href="/pipeline"
+        className="flex flex-col justify-center cursor-pointer group"
+      >
         <span
-          className={`font-sans text-sm font-semibold tracking-widest ${isDark ? "text-cp-text" : "text-slate-800"}`}
+          className={`font-sans text-sm font-semibold tracking-widest ${isDark ? "text-cp-text" : "text-slate-800"} group-hover:text-cp-accent transition-colors`}
           style={{ letterSpacing: "0.22em" }}
         >
-          COCKPIT
+          LAND IT
         </span>
-        <span className="font-mono text-[9px] text-cp-text-mute leading-none mt-0.5">
+        <span className="font-mono text-[9px] text-cp-text-mute leading-none mt-0.5 group-hover:text-cp-text-dim transition-colors">
           your job search, on autopilot
         </span>
-      </div>
+      </a>
 
       {/* Center: Command palette trigger */}
       <button

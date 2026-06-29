@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, ArrowLeft, Zap } from "lucide-react";
+import { ChevronRight, ArrowLeft, Zap, Briefcase } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DEMO_APPLICATIONS } from "../../lib/demoData";
 import type { DemoApplication } from "../../lib/demoData";
@@ -361,14 +361,13 @@ export default function CenterStage({ filter, selectedAppId, onSelectApp }: Cent
                 {/* Company */}
                 <div className="flex w-40 items-center gap-2.5 py-3">
                   <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-bold"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl"
                     style={{
-                      background: "linear-gradient(135deg, #00F5A0, #8A2BE2)",
-                      color: "#060914",
-                      boxShadow: "0 4px 12px rgba(0,245,160,0.25)",
+                      backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+                      border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
                     }}
                   >
-                    {app.logoInitial}
+                    <Briefcase size={12} style={{ color: "#00F5A0" }} />
                   </div>
                   <span className="font-sans text-[13px] font-medium truncate" style={{ color: isDark ? "#f0f4ff" : "#111827" }}>
                     {app.company}
