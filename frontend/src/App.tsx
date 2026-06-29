@@ -1,4 +1,4 @@
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Dashboard from "./pages/Dashboard";
 import Jobs from "./pages/Jobs";
@@ -11,13 +11,14 @@ import Onboarding from "./pages/Onboarding";
 import Demo from "./pages/Demo";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
+import Cockpit from "./pages/Cockpit";
 import AuthGuard from "./components/shared/AuthGuard";
 import { useThemeStore } from "./store/useThemeStore";
 import { useAuthStore } from "./store/useAuthStore";
 import Tutorial, { STORAGE_KEY } from "./components/shared/Tutorial";
 
 const NAV_LINKS = [
-  { href: "/", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1" },
+  { href: "/cockpit", label: "Cockpit", icon: "M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" },
   { href: "/tailor", label: "Tailor", icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" },
   { href: "/pitcher", label: "Pitcher", icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" },
   { href: "/coach", label: "Coach", icon: "M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" },
@@ -112,6 +113,8 @@ export default function App() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const initialize = useAuthStore((s) => s.initialize);
 
+  const isCockpit = location.pathname === "/cockpit";
+
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -119,12 +122,22 @@ export default function App() {
 
   useEffect(() => { initialize(); }, [initialize]);
 
-  // Auto-show tutorial on first visit
   useEffect(() => {
     if (!localStorage.getItem(STORAGE_KEY)) {
       setTutorialOpen(true);
     }
   }, []);
+
+  // Cockpit gets a full-viewport layout with no outer nav/main wrapper
+  if (isCockpit) {
+    return (
+      <>
+        <Routes>
+          <Route path="/cockpit" element={<AuthGuard><Cockpit /></AuthGuard>} />
+        </Routes>
+      </>
+    );
+  }
 
   return (
     <div className="relative min-h-screen">
@@ -144,7 +157,7 @@ export default function App() {
       <nav className="sticky top-0 z-50 border-b border-[var(--border-primary)] backdrop-blur-xl" style={{ background: "var(--bg-secondary)", opacity: 0.95 }}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           {/* Logo */}
-          <a href="/" className="flex items-center gap-2 group">
+          <a href="/cockpit" className="flex items-center gap-2 group">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/20 transition-shadow group-hover:shadow-amber-500/40">
               <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -178,6 +191,14 @@ export default function App() {
               </svg>
               Demo
             </a>
+
+            {/* Open Cockpit CTA */}
+            <a
+              href="/cockpit"
+              className="ml-2 flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-emerald-500/40"
+            >
+              Open Cockpit
+            </a>
           </div>
 
           {/* Help + Theme + User */}
@@ -207,8 +228,11 @@ export default function App() {
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/demo" element={<Demo />} />
 
+            {/* Redirect / to /cockpit */}
+            <Route path="/" element={<Navigate to="/cockpit" replace />} />
+
             {/* Protected routes */}
-            <Route path="/" element={<AuthGuard><Dashboard /></AuthGuard>} />
+            <Route path="/dashboard" element={<AuthGuard><Dashboard /></AuthGuard>} />
             <Route path="/jobs" element={<AuthGuard><Jobs /></AuthGuard>} />
             <Route path="/tailor" element={<AuthGuard><Tailor /></AuthGuard>} />
             <Route path="/pitcher" element={<AuthGuard><Pitcher /></AuthGuard>} />
