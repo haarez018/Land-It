@@ -29,3 +29,6 @@ slowapi>=0.1.9
 
 # Lemma SDK
 lemma-sdk>=0.5.3
+
+# Pydantic email validation
+email-validator>=2.0.0
