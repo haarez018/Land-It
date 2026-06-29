@@ -30,6 +30,9 @@ dependencies = [
     # Database — Supabase
     "supabase>=2.9.0",
 
+    # Database — Lemma Pod
+    "lemma-sdk>=0.5.3",
+
     # HTTP client
     "httpx>=0.27.0",
 ]
