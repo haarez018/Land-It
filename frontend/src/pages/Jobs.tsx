@@ -23,7 +23,7 @@ export default function Jobs() {
   const [location, setLocation]   = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<{ found: number; queued: number; scored: boolean } | null>(null);
+  const [searchResult, setSearchResult] = useState<{ found: number; queued: number; scored: boolean; data_source: string } | null>(null);
   const [searchErr, setSearchErr] = useState("");
 
   // Manual paste state
@@ -52,8 +52,8 @@ export default function Jobs() {
         resume_id: resume?.id ?? "",
         max_results: 20,
       });
-      const d = res.data as { jobs_found: number; jobs_queued: number; scored: boolean };
-      setSearchResult({ found: d.jobs_found, queued: d.jobs_queued, scored: d.scored });
+      const d = res.data as { jobs_found: number; jobs_queued: number; scored: boolean; data_source: string };
+      setSearchResult({ found: d.jobs_found, queued: d.jobs_queued, scored: d.scored, data_source: d.data_source ?? "scrapers" });
       await fetchJobs(); // refresh queue
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -92,11 +92,13 @@ export default function Jobs() {
           </span>
           <h2 className="text-lg font-semibold text-theme">Search Live Jobs</h2>
           <span className="ml-auto rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400">
-            FREE · No API key needed
+            {searchResult?.data_source === "jsearch" ? "live · jsearch" : "FREE · No API key needed"}
           </span>
         </div>
         <p className="mt-1 text-xs text-muted-theme">
-          Pulls real listings from Remotive &amp; Arbeitnow — remote-friendly tech roles.
+          {searchResult?.data_source === "jsearch"
+            ? "Pulling live listings via JSearch — LinkedIn, Indeed, Glassdoor & ZipRecruiter."
+            : "Pulls real listings from Remotive & Arbeitnow — remote-friendly tech roles."}
           {resume && <span className="ml-1 text-cp-accent">Auto-scoring against your resume.</span>}
         </p>
 

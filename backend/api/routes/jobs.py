@@ -99,15 +99,35 @@ async def search_live_jobs(
             pass
 
     try:
+        from backend.agents.scout.scrapers.jsearch import JSearchScraper
         from backend.agents.scout.scrapers.remotive import RemotiveScraper
         from backend.agents.scout.scrapers.arbeitnow import ArbeitnowScraper
+        from backend.config import settings
 
-        half = max(request.max_results // 2, 10)
-        remotive_jobs = await RemotiveScraper().search(request.query, max_results=half)
-        arbeitnow_jobs = await ArbeitnowScraper().search(
-            request.query, request.location, max_results=half
-        )
-        scraped = (remotive_jobs + arbeitnow_jobs)[: request.max_results]
+        scraped = []
+        data_source = "scrapers"
+
+        jsearch = JSearchScraper(api_key=settings.JSEARCH_API_KEY or "")
+        if jsearch._ready():
+            try:
+                scraped = await jsearch.search(
+                    request.query,
+                    location=request.location,
+                    max_results=request.max_results,
+                    remote_only=request.remote_only,
+                    date_posted=request.date_posted or "week",
+                )
+                data_source = "jsearch"
+            except Exception:
+                scraped = []
+
+        if not scraped:
+            half = max(request.max_results // 2, 10)
+            remotive_jobs = await RemotiveScraper().search(request.query, max_results=half)
+            arbeitnow_jobs = await ArbeitnowScraper().search(
+                request.query, request.location, max_results=half
+            )
+            scraped = (remotive_jobs + arbeitnow_jobs)[: request.max_results]
 
         jobs_out = []
         rows = []
@@ -142,6 +162,7 @@ async def search_live_jobs(
             "jobs_found": len(scraped),
             "jobs_queued": len(jobs_out),
             "scored": bool(resume),
+            "data_source": data_source,
             "jobs": [j.model_dump(mode="json") for j in jobs_out],
             "errors": [],
         }
