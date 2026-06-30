@@ -239,6 +239,8 @@ async def ab_test_resumes(
     role_type: Optional[str] = None,
     seniority: Optional[str] = None,
     company: Optional[str] = None,
+    user_id: Optional[str] = None,
+    save_result: bool = True,
 ) -> ABTestResult:
     """
     A/B test two resume versions against the same JD.
@@ -297,7 +299,7 @@ async def ab_test_resumes(
         a_advantages, b_advantages, merge_suggestions,
     )
 
-    return ABTestResult(
+    result = ABTestResult(
         version_a_id=version_a.id,
         version_b_id=version_b.id,
         jd_id=jd.id,
@@ -321,3 +323,28 @@ async def ab_test_resumes(
         role_type=ats_a.role_type,
         seniority_level=ats_a.seniority_level,
     )
+
+    if save_result and user_id:
+        try:
+            from backend.db import get_db
+            get_db().table("ab_tests").insert({
+                "user_id": user_id,
+                "resume_a_id": version_a.id,
+                "resume_b_id": version_b.id,
+                "job_id": jd.id,
+                "score_a": combined_a,
+                "score_b": combined_b,
+                "winner": overall_winner,
+                "dimensions_a": [
+                    {"id": c.dimension_id, "name": c.dimension_name, "score": c.score_a, "weight": c.weight}
+                    for c in all_comps
+                ],
+                "dimensions_b": [
+                    {"id": c.dimension_id, "name": c.dimension_name, "score": c.score_b, "weight": c.weight}
+                    for c in all_comps
+                ],
+            }).execute()
+        except Exception:
+            pass  # DB errors must not block the scoring result
+
+    return result

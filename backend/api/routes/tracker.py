@@ -203,6 +203,21 @@ async def classify_email(
     )
 
 
+class ScanEmailsRequest(BaseModel):
+    access_token: str
+
+
+@router.post("/scan-emails")
+async def scan_emails(
+    request: ScanEmailsRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Scan Gmail inbox for job-related emails using a user-supplied OAuth access token."""
+    from backend.agents.tracker.email_monitor import poll_gmail_inbox
+    results = await poll_gmail_inbox(user_id, request.access_token)
+    return {"scanned": len(results), "results": results}
+
+
 @router.get("/{app_id}/valid-transitions")
 async def get_valid_transitions(
     app_id: str,

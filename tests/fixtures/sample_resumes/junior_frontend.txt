@@ -1,0 +1,42 @@
+Sarah Kim
+sarah.kim@gmail.com
+Los Angeles, CA
+github.com/sarahkim
+
+Summary
+Recent CS graduate seeking frontend engineering roles. Experienced with React, TypeScript, and modern web development through internships and personal projects.
+
+Experience
+TechCorp — Frontend Engineering Intern
+June 2024 - August 2024
+Los Angeles, CA
+- Built responsive UI components using React and TypeScript for the customer dashboard
+- Worked on accessibility improvements, increasing WCAG compliance score from 72 to 91
+- Participated in code reviews and daily standups with the product team
+
+Skills
+Languages: JavaScript, TypeScript, Python, HTML, CSS
+Frameworks: React, Next.js, TailwindCSS, Vue.js
+Tools: Git, Figma, Vite, Jest
+
+Projects
+TaskFlow — Personal project management app
+- Built a full-stack task management app using Next.js, TypeScript, and Supabase
+- Implemented real-time collaboration using WebSockets
+- Deployed on Vercel with 50+ active users
+https://github.com/sarahkim/taskflow
+
+WeatherNow — Weather dashboard
+- Created a weather dashboard using React and OpenWeatherMap API
+- Used Chart.js for data visualization of 7-day forecasts
+
+Education
+UCLA
+B.S. in Computer Science
+June 2024
+GPA: 3.6
+Honors: Cum Laude
+Relevant Courses: Data Structures, Algorithms, Web Development, Database Systems, HCI
+
+Languages
+English, Korean

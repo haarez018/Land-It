@@ -1,0 +1,34 @@
+Data Scientist, ML Platform
+at Airbnb
+San Francisco, CA | Hybrid
+
+About the Role
+Join our ML Platform team to build and improve the machine learning systems that power personalization, search ranking, and pricing across Airbnb. You'll work at the intersection of data science and engineering.
+
+Responsibilities
+- Develop and deploy machine learning models for search ranking, recommendation, and dynamic pricing
+- Design and analyze A/B experiments to measure model impact on business metrics
+- Build and maintain feature engineering pipelines using Spark and Airflow
+- Collaborate with product teams to translate business problems into ML solutions
+- Present findings to stakeholders and drive adoption of ML-powered features
+
+Requirements
+- Master's or Ph.D. in Computer Science, Statistics, Mathematics, or related field
+- 3+ years of experience in applied machine learning or data science
+- Strong proficiency in Python and SQL
+- Experience with ML frameworks (PyTorch, TensorFlow, or Scikit-learn)
+- Experience with large-scale data processing (Spark, Hadoop)
+- Solid understanding of statistics, experimental design, and causal inference
+- Experience deploying models to production
+
+Nice to Have
+- Experience with recommendation systems or search ranking
+- Familiarity with Airflow, MLflow, or similar orchestration tools
+- Experience in the travel, marketplace, or e-commerce domain
+- Publications in ML/AI conferences (NeurIPS, ICML, KDD)
+- Experience with deep learning for NLP or computer vision
+
+Tech Stack
+Python, PyTorch, Scikit-learn, Spark, Airflow, SQL, Hadoop, MLflow, AWS
+
+Compensation: $175,000 - $240,000 + equity

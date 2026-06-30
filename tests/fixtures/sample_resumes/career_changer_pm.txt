@@ -1,0 +1,49 @@
+Michael Torres
+michael.torres@email.com | +1-555-987-6543
+Austin, TX
+linkedin.com/in/michaeltorres
+
+Summary
+Former mechanical engineer transitioning to product management. 6 years of engineering experience with growing product ownership. MBA with focus on technology strategy.
+
+Experience
+AutoTech Inc — Product Lead (Engineering)
+March 2022 - Present
+Austin, TX
+- Drove product roadmap for the IoT sensor platform, growing ARR from $2M to $8M in 18 months
+- Managed cross-functional team of 15 (engineering, design, QA) to deliver 3 major releases on schedule
+- Conducted 40+ customer interviews to define product requirements for the V2 platform
+- Reduced customer churn by 25% by implementing a data-driven feature prioritization framework
+
+AutoTech Inc — Senior Mechanical Engineer
+January 2019 - February 2022
+Austin, TX
+- Designed sensor housing components using SolidWorks, reducing manufacturing cost by 30%
+- Led the transition from waterfall to agile methodology for the hardware team
+- Coordinated with firmware and software teams on 5 product launches
+
+GreenEnergy Corp — Mechanical Engineer
+July 2016 - December 2018
+Denver, CO
+- Developed thermal simulation models for solar panel installations
+- Assisted in project management for 3 utility-scale installations totaling $15M
+
+Education
+University of Texas at Austin
+MBA, Technology Management
+May 2022
+
+Colorado School of Mines
+B.S. in Mechanical Engineering
+May 2016
+GPA: 3.5
+
+Skills
+Product: Roadmap planning, User research, A/B testing, SQL, Amplitude, Mixpanel
+Technical: Python, SQL, Jira, Confluence, Figma
+Methodologies: Agile, Scrum, Design Thinking, Jobs-to-be-Done
+Domain: IoT, SaaS B2B, Hardware-software integration
+
+Awards
+AutoTech Innovation Award 2023
+Best Capstone Project, Colorado School of Mines 2016

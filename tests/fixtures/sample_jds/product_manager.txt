@@ -1,0 +1,34 @@
+Product Manager, Growth
+at Notion
+San Francisco, CA | Remote
+
+About Us
+Notion is the connected workspace where better, faster work happens. We're looking for a Product Manager to lead our Growth team and drive user acquisition, activation, and retention strategies.
+
+What You'll Do
+- Own the product roadmap for growth initiatives, including onboarding, activation flows, and referral programs
+- Analyze user behavior data using SQL, Amplitude, and Mixpanel to identify growth opportunities
+- Run A/B experiments to optimize conversion funnels
+- Work cross-functionally with engineering, design, data science, and marketing teams
+- Present findings and strategy to leadership on a weekly basis
+- Define and track key growth metrics (DAU, WAU, activation rate, churn)
+
+Qualifications
+- 4+ years of product management experience at a technology company
+- Proven track record of driving measurable growth metrics (2x improvement or greater)
+- Strong analytical skills — proficiency in SQL is required
+- Experience running A/B tests and making data-driven product decisions
+- Excellent written and verbal communication skills
+- Experience working in SaaS B2B or productivity tools space
+
+Preferred Qualifications
+- MBA or equivalent experience
+- Experience with product-led growth (PLG) strategies
+- Familiarity with experimentation platforms (LaunchDarkly, Optimizely)
+- Background in design thinking or user research
+- Experience at a high-growth startup (Series B-D)
+
+Our Values
+We believe in craftsmanship, transparency, and building tools that empower everyone to create.
+
+Compensation: $160,000 - $220,000 + equity

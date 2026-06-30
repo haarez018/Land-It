@@ -1,0 +1,49 @@
+Alex Chen
+alex.chen@email.com | +1-555-123-4567
+San Francisco, CA
+linkedin.com/in/alexchen | github.com/alexchen
+
+Summary
+Senior backend engineer with 8+ years building distributed systems at scale. Led teams of up to 12 engineers. Passionate about system design, reliability, and mentoring junior engineers.
+
+Experience
+Google — Senior Software Engineer
+January 2020 - Present
+San Francisco, CA
+- Architected a high-throughput event processing pipeline handling 5M events/day using Kafka and Go, reducing end-to-end latency by 40%
+- Led a team of 8 engineers to redesign the user notification service, increasing delivery reliability from 94% to 99.7%
+- Spearheaded migration from monolithic architecture to microservices, reducing deployment time by 60%
+- Mentored 4 junior engineers through the promotion process to L4
+
+Stripe — Software Engineer
+March 2017 - December 2019
+San Francisco, CA
+- Built the real-time fraud detection API serving 50K requests/second with p99 latency under 100ms using Python and Redis
+- Designed and implemented a distributed rate limiter used across 12 internal services
+- Reduced infrastructure costs by $2.1M/year by optimizing database query patterns and implementing connection pooling
+- Managed the on-call rotation for the Payments API team of 6 engineers
+
+Startup Co — Junior Software Engineer
+June 2015 - February 2017
+New York, NY
+- Developed REST APIs using Django and PostgreSQL for the core product
+- Implemented CI/CD pipeline using Jenkins, reducing deployment frequency from weekly to daily
+- Helped build the initial data pipeline processing 100K records/day
+
+Education
+Stanford University
+B.S. in Computer Science
+June 2015
+GPA: 3.8
+Dean's List
+
+Skills
+Languages: Python, Go, Java, TypeScript
+Frameworks: Django, FastAPI, gRPC, React
+Infrastructure: AWS, Kubernetes, Docker, Terraform
+Databases: PostgreSQL, Redis, DynamoDB, Elasticsearch
+Tools: Kafka, RabbitMQ, Git, DataDog, Prometheus
+
+Certifications
+AWS Solutions Architect Professional
+Google Cloud Professional Cloud Architect

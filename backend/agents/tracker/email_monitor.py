@@ -132,6 +132,91 @@ def classify_email(subject: str, body: str) -> EmailSignal:
     )
 
 
+# ── Gmail polling via OAuth access token ────────────────────────────────────
+
+_ACTION_MAP = {
+    "interview": "Schedule interview ASAP",
+    "phone_screen": "Reply to confirm phone screen",
+    "offer": "Review offer letter and negotiate",
+    "rejection": "No action needed",
+    "acknowledgement": "Wait for next contact",
+    "follow_up_reply": "Update application status",
+    "unknown": "Review manually",
+}
+
+_JOB_SUBJECT_KEYWORDS = {
+    "offer", "interview", "application", "position", "role",
+    "regret", "unfortunately", "excited", "next step", "next steps",
+    "hiring", "recruiter", "opportunity", "candidate",
+}
+
+
+async def poll_gmail_inbox(user_id: str, access_token: str) -> list[dict]:
+    """
+    Scan the last 50 Gmail messages for job-related emails using an OAuth access token.
+
+    Returns a list of classified email dicts, one per job-related email found.
+    Never raises — returns empty list on any API error so callers stay unblocked.
+    """
+    import httpx
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    results: list[dict] = []
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            list_resp = await client.get(
+                "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+                headers=headers,
+                params={"maxResults": 50},
+            )
+            if list_resp.status_code != 200:
+                return []
+
+            message_ids = [m["id"] for m in list_resp.json().get("messages", [])]
+
+            for msg_id in message_ids:
+                msg_resp = await client.get(
+                    f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}",
+                    headers=headers,
+                    params={"format": "metadata", "metadataHeaders": ["Subject", "From"]},
+                )
+                if msg_resp.status_code != 200:
+                    continue
+
+                msg_data = msg_resp.json()
+                hdrs = msg_data.get("payload", {}).get("headers", [])
+                subject = next((h["value"] for h in hdrs if h["name"] == "Subject"), "")
+                sender = next((h["value"] for h in hdrs if h["name"] == "From"), "")
+
+                subject_lower = subject.lower()
+                if not any(kw in subject_lower for kw in _JOB_SUBJECT_KEYWORDS):
+                    continue
+
+                snippet = msg_data.get("snippet", "")
+                signal = classify_email(subject, snippet)
+
+                company_guess = ""
+                if "@" in sender:
+                    domain = sender.split("@")[-1].rstrip(">").strip()
+                    company_guess = domain.split(".")[0].capitalize()
+
+                results.append({
+                    "email_id": msg_id,
+                    "subject": subject,
+                    "sender": sender,
+                    "classified_as": signal.signal_type,
+                    "confidence": signal.confidence,
+                    "company_guess": company_guess,
+                    "action_required": _ACTION_MAP.get(signal.signal_type, "Review manually"),
+                    "snippet": snippet[:200],
+                })
+    except Exception:
+        pass
+
+    return results
+
+
 # ── Gmail integration stub ──────────────────────────────────────────────────
 
 class GmailMonitor:

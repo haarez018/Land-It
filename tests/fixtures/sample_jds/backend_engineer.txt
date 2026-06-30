@@ -1,0 +1,37 @@
+Senior Backend Engineer
+at Stripe
+San Francisco, CA | Hybrid
+
+About the Role
+We are looking for a Senior Backend Engineer to join our Payments Infrastructure team. You will design and build the core systems that process billions of dollars in payments annually. This is a high-impact role where your work directly affects Stripe's reliability and performance.
+
+Responsibilities
+- Design and implement scalable, fault-tolerant backend services processing millions of transactions daily
+- Lead technical design reviews and drive architectural decisions for the payments platform
+- Mentor junior and mid-level engineers on system design and best practices
+- Collaborate with product, security, and SRE teams to ensure 99.99% uptime
+- Optimize database performance and query patterns for high-throughput workloads
+
+Requirements
+- 5+ years of experience in backend software engineering
+- Strong proficiency in Go, Python, or Java
+- Deep experience with distributed systems, microservices, and event-driven architectures
+- Expertise with PostgreSQL, Redis, and message queues (Kafka or RabbitMQ)
+- Experience with AWS or GCP cloud infrastructure
+- Strong understanding of API design (REST, gRPC)
+- Bachelor's degree in Computer Science or equivalent
+
+Nice to Have
+- Experience in fintech or payments industry
+- Familiarity with Kubernetes and Terraform
+- Experience with observability tools (DataDog, Prometheus, Grafana)
+- Open source contributions
+- Experience leading teams of 3+ engineers
+
+Tech Stack
+Go, Python, PostgreSQL, Redis, Kafka, AWS, Kubernetes, Docker, Terraform, gRPC, DataDog
+
+Compensation
+$180,000 - $250,000 base + equity
+
+We value honest communication, intellectual curiosity, and moving fast with purpose.
