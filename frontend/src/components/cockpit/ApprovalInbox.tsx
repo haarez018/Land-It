@@ -6,6 +6,15 @@ import type { DemoApproval } from "../../lib/demoData";
 import { useAgentStore } from "../../store/useAgentStore";
 import { useThemeStore } from "../../store/useThemeStore";
 
+const _API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "/api";
+
+async function _lemmaApprove(id: string) {
+  try { await fetch(`${_API_BASE}/lemma/approvals/${id}/approve`, { method: "POST" }); } catch { /* pod offline */ }
+}
+async function _lemmaSkip(id: string) {
+  try { await fetch(`${_API_BASE}/lemma/approvals/${id}/skip`, { method: "POST" }); } catch { /* pod offline */ }
+}
+
 interface ApprovalCardProps {
   approval: DemoApproval;
   onApprove: (id: string) => void;
@@ -118,10 +127,12 @@ export default function ApprovalInbox() {
       setTimeout(() => setAgentStatus(approval.agentId, "idle"), 1200);
     }
     setApprovals((prev) => prev.filter((a) => a.id !== id));
+    _lemmaApprove(id);
   };
 
   const handleSkip = (id: string) => {
     setApprovals((prev) => prev.filter((a) => a.id !== id));
+    _lemmaSkip(id);
   };
 
   const glassPanel = isDark

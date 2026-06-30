@@ -3,14 +3,27 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel as _BaseModel
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from backend.config import settings
 from backend.api.routes import resume, jobs, applications, coach, planner, auth, pitcher, tracker, onboarding, exports, demo
 from backend.auth_deps import get_current_user_id
 from backend.tasks.scheduler import scheduler_lifespan
+
+_IS_PROD = settings.ENVIRONMENT == "production"
+
+def _lim(prod_limit: str) -> str:
+    """Return rate limit string for production; 1000/minute in development."""
+    return prod_limit if _IS_PROD else "1000/minute"
+
+limiter = Limiter(key_func=get_remote_address)
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +97,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(
+    RateLimitExceeded,
+    lambda req, exc: JSONResponse(
+        {"error": "rate_limit_exceeded", "detail": str(exc)},
+        status_code=429,
+    ),
+)
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -114,17 +136,23 @@ def _db_row_to_entry(row: dict):
     )
 
 
+from backend.api.websockets.coach_stream import ws_router as _coach_ws_router, sse_router as _coach_sse_router
+from backend.api.routes.lemma import router as _lemma_router
+
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(resume.router, prefix="/api/resume", tags=["Resume & Scoring"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(applications.router, prefix="/api/applications", tags=["Applications"])
 app.include_router(coach.router, prefix="/api/coach", tags=["Mock Interviews"])
+app.include_router(_coach_sse_router, prefix="/api/coach", tags=["Mock Interviews"])
+app.include_router(_coach_ws_router)  # websocket routes carry their own /ws/coach/... prefix
 app.include_router(planner.router, prefix="/api/planner", tags=["Planner & Strategy"])
 app.include_router(pitcher.router, prefix="/api/pitcher", tags=["Cover Letters"])
 app.include_router(tracker.router, prefix="/api/tracker", tags=["Application Tracker"])
 app.include_router(onboarding.router, prefix="/api/onboarding", tags=["Onboarding"])
 app.include_router(exports.router, prefix="/api/export", tags=["Export Reports"])
 app.include_router(demo.router, prefix="/api/demo", tags=["Demo"])
+app.include_router(_lemma_router, prefix="/api/lemma", tags=["Lemma Pod"])
 
 
 @app.get("/health", tags=["System"])
@@ -133,11 +161,33 @@ async def health_check():
     return {"status": "ok", "version": "1.0.0", "environment": settings.ENVIRONMENT}
 
 
+# ── Calibration Dashboard ──────────────────────────────────────────────────
+
+@app.get("/api/calibration", tags=["Analytics"])
+@limiter.limit(_lim("60/minute"))
+async def get_calibration(request: Request, user_id: str = Depends(get_current_user_id)):
+    """Compute Brier score calibration from resolved applications."""
+    from backend.agents.planner.confidence_calibration import compute_brier_scores
+    dashboard = await compute_brier_scores(user_id)
+    return {
+        "overall_brier": dashboard.overall_brier,
+        "sharpness": dashboard.sharpness,
+        "n_resolved": dashboard.n_resolved,
+        "accuracy": dashboard.accuracy,
+        "predicted_callbacks": dashboard.predicted_callbacks,
+        "actual_callbacks": dashboard.actual_callbacks,
+        "calibration_buckets": dashboard.calibration_buckets,
+        "is_well_calibrated": dashboard.is_well_calibrated,
+        "interpretation": dashboard.interpretation,
+    }
+
+
 # ── Analytics endpoints ────────────────────────────────────────────────────
 
 
 @app.get("/api/analytics", tags=["Analytics"])
-async def get_analytics(user_id: str = Depends(get_current_user_id)):
+@limiter.limit(_lim("60/minute"))
+async def get_analytics(request: Request, user_id: str = Depends(get_current_user_id)):
     """Compute job search analytics from all applications and score history."""
     from backend.agents.planner.strategy import ApplicationEntry
     from backend.agents.planner.analytics import compute_analytics_ai
@@ -172,7 +222,8 @@ async def get_dimension_heatmap():
 
 
 @app.post("/api/salary/estimate", tags=["Salary Intelligence"])
-async def salary_estimate(request: SalaryEstimateRequest, user_id: str = Depends(get_current_user_id)):
+@limiter.limit(_lim("20/minute"))
+async def salary_estimate(http_request: Request, request: SalaryEstimateRequest, user_id: str = Depends(get_current_user_id)):
     """Estimate salary range for a resume + JD combination."""
     from backend.api.routes.resume import load_user_resume
     from backend.parsers.jd_parser import parse_jd
@@ -221,7 +272,8 @@ async def salary_locations():
 
 
 @app.post("/api/resume/{resume_id}/bias-check", tags=["Bias Detection"])
-async def bias_check(resume_id: str, user_id: str = Depends(get_current_user_id)):
+@limiter.limit(_lim("20/minute"))
+async def bias_check(request: Request, resume_id: str, user_id: str = Depends(get_current_user_id)):
     """Scan resume for gendered, age, cultural, and disability bias signals."""
     from backend.api.routes.resume import load_user_resume
     from backend.agents.tailor.bias_detector import detect_bias
@@ -296,7 +348,8 @@ async def match_story(request: MatchStoryRequest):
 
 
 @app.post("/api/career/simulate/{resume_id}", tags=["Career Simulator"])
-async def simulate_career(resume_id: str, user_id: str = Depends(get_current_user_id)):
+@limiter.limit(_lim("10/minute"))
+async def simulate_career(request: Request, resume_id: str, user_id: str = Depends(get_current_user_id)):
     """Simulate 3-track career path based on current resume."""
     from backend.api.routes.resume import load_user_resume
     from backend.agents.planner.career_simulator import simulate_career as _sim

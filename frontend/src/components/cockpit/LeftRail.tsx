@@ -1,8 +1,11 @@
 import { Radio, History } from "lucide-react";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { DEMO_APPLICATIONS } from "../../lib/demoData";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useAgentStore } from "../../store/useAgentStore";
+
+const _API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "/api";
 
 type PipelineStatus = "Discovered" | "Tailored" | "Applied" | "Interviewing" | "Closed";
 
@@ -27,6 +30,14 @@ export default function LeftRail({ activeFilter, onFilterChange }: LeftRailProps
   const theme = useThemeStore((s) => s.theme);
   const isDark = theme === "dark";
   const agents = useAgentStore((s) => s.agents);
+
+  const [podRows, setPodRows] = useState<number | null>(null);
+  useEffect(() => {
+    fetch(`${_API_BASE}/lemma/stats`)
+      .then((r) => r.json())
+      .then((d) => { if (d.connected) setPodRows(d.total_rows); })
+      .catch(() => {});
+  }, []);
 
   const counts = PIPELINE_STATUSES.reduce<Record<PipelineStatus, number>>(
     (acc, s) => { acc[s] = DEMO_APPLICATIONS.filter((a) => a.status === s).length; return acc; },
@@ -165,9 +176,9 @@ export default function LeftRail({ activeFilter, onFilterChange }: LeftRailProps
               </span>
             </div>
             <div className="flex justify-between">
-              <span>Engine:</span>
-              <span className="text-[10px] opacity-80">
-                lemma-sdk
+              <span>Rows:</span>
+              <span className="text-[10px] font-semibold" style={{ color: podRows !== null ? "#00F5A0" : textDim }}>
+                {podRows !== null ? podRows : "—"}
               </span>
             </div>
           </div>
