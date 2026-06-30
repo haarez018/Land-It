@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.auth_deps import get_current_user_id
@@ -73,6 +74,153 @@ async def upload_resume(
 
     save_user_resume(resume, user_id, filename=file.filename or "")
     return resume
+
+
+# ── A/B Test History ──────────────────────────────────────────────────────────
+
+@router.get("/ab-tests")
+async def list_ab_tests(
+    page: int = 1,
+    per_page: int = 20,
+    user_id: str = Depends(get_current_user_id),
+):
+    """List past A/B test results for this user, newest first."""
+    offset = (page - 1) * per_page
+    resp = (
+        get_db().table("ab_tests")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .range(offset, offset + per_page - 1)
+        .execute()
+    )
+    return {"page": page, "per_page": per_page, "results": resp.data}
+
+
+@router.get("/ab-tests/{test_id}")
+async def get_ab_test(
+    test_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Get full breakdown of a single A/B test result."""
+    resp = (
+        get_db().table("ab_tests")
+        .select("*")
+        .eq("id", test_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if not resp.data:
+        raise HTTPException(404, "A/B test not found")
+    return resp.data[0]
+
+
+# ── Tailor SSE Stream (demo — no auth required) ──────────────────────────────
+
+
+class TailorStreamRequest(BaseModel):
+    resume_text: str
+    jd_text: str
+
+
+@router.post("/tailor-stream")
+async def tailor_stream(request: TailorStreamRequest):
+    """SSE: stream resume rewriting with live 22-dimension score updates."""
+    import asyncio
+    import json
+    import re
+
+    async def _event_stream():
+        from backend.config import settings
+        import anthropic
+
+        if not settings.ANTHROPIC_API_KEY:
+            yield f"data: {json.dumps({'type': 'error', 'text': 'api key not set'})}\n\n"
+            return
+
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+        system = (
+            "You are a professional resume writer. Rewrite the given resume excerpt to better "
+            "match the job description. Keep all real facts and metrics. Use JD keywords "
+            "naturally, strengthen impact statements, and add measurable outcomes where sensible. "
+            "Output only the improved resume text."
+        )
+
+        rewritten = ""
+        async with client.messages.stream(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=600,
+            system=system,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Resume:\n{request.resume_text}\n\n"
+                    f"Job Description:\n{request.jd_text}\n\n"
+                    "Rewrite the resume to better match this job."
+                ),
+            }],
+        ) as stream:
+            async for text in stream.text_stream:
+                rewritten += text
+                yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
+
+        # Compute keyword improvements for live heatmap updates
+        jd_keywords = {w.lower() for w in re.findall(r'\b[a-zA-Z]{4,}\b', request.jd_text)}
+
+        def _kw_score(text: str) -> float:
+            words = {w.lower() for w in re.findall(r'\b[a-zA-Z]{4,}\b', text)}
+            if not jd_keywords:
+                return 70.0
+            return min(100.0, 50.0 + (len(words & jd_keywords) / len(jd_keywords)) * 70.0)
+
+        def _num_count(text: str) -> int:
+            return len(re.findall(r'\b\d+[%KMBx]?\b', text))
+
+        _VERBS = {
+            "built", "designed", "led", "shipped", "reduced", "increased", "improved",
+            "implemented", "developed", "launched", "scaled", "optimized", "delivered",
+            "architected", "owned", "collaborated", "managed", "created", "drove",
+            "achieved", "automated", "migrated", "engineered", "deployed", "orchestrated",
+        }
+
+        def _verb_count(text: str) -> int:
+            return len({w.lower() for w in re.findall(r'\b[a-z]+\b', text)} & _VERBS)
+
+        bkw = _kw_score(request.resume_text)
+        akw = _kw_score(rewritten)
+        bn = _num_count(request.resume_text)
+        an = _num_count(rewritten)
+        bv = _verb_count(request.resume_text)
+        av = _verb_count(rewritten)
+
+        updates: list[tuple[str, int, int]] = []
+        kd = akw - bkw
+        if kd > 3:
+            updates.append(("Keyword Match", round(bkw), min(100, round(akw))))
+            if kd > 5:
+                updates.append(("Skills Alignment", round(bkw - 2), min(100, round(akw - 1))))
+                updates.append(("Tech Stack", round(bkw - 4), min(100, round(akw + 1))))
+            updates.append(("Responsibilities", round(bkw - 6), min(100, round(akw - 3))))
+        if an > bn:
+            updates.append(("Quantification", min(80, round(60 + bn * 5)), min(100, round(60 + an * 5))))
+        if av > bv:
+            updates.append(("Action Verbs", min(85, round(70 + bv * 3)), min(100, round(70 + av * 3))))
+        if kd > 4:
+            updates.append(("Impact Stories", round(bkw - 8), min(100, round(akw - 4))))
+
+        for dim, before_score, after_score in updates:
+            if after_score > before_score:
+                yield f"data: {json.dumps({'type': 'dimension_update', 'dimension': dim, 'before': before_score, 'after': after_score})}\n\n"
+                await asyncio.sleep(0.12)
+
+        yield f"data: {json.dumps({'type': 'done', 'final_score': round(akw)})}\n\n"
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/{resume_id}", response_model=Resume)
@@ -492,7 +640,11 @@ async def ab_test_endpoint(
     _jd_store[jd.id] = jd
 
     from backend.agents.tailor.ab_testing import ab_test_resumes
-    result = await ab_test_resumes(version_a, version_b, jd, role_type=request.role_type, seniority=request.seniority)
+    result = await ab_test_resumes(
+        version_a, version_b, jd,
+        role_type=request.role_type, seniority=request.seniority,
+        user_id=user_id, save_result=True,
+    )
 
     return ABTestResponse(
         version_a_id=result.version_a_id, version_b_id=result.version_b_id, jd_id=result.jd_id,

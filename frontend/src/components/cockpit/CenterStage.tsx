@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronRight, ArrowLeft, Zap, Briefcase } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DEMO_APPLICATIONS } from "../../lib/demoData";
@@ -16,7 +16,7 @@ const STATUS_COLORS: Record<PipelineStatus, string> = {
   Closed: "#475569",
 };
 
-const MOCK_STREAM_WORDS = `Designed and shipped a distributed payment infrastructure handling 2M transactions per day with 99.99% uptime across 15 global regions. Led the TypeScript migration of 3 critical services with zero downtime deployment. Reduced p99 API latency by 40% through query optimization connection pooling and intelligent caching layers. Collaborated cross-functionally with product and design to deliver user-facing features used by 500K active merchants.`.split(" ");
+const _API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "/api";
 
 function HeatmapTooltip({ name, score, isDark }: { name: string; score: number; isDark: boolean }) {
   return (
@@ -57,11 +57,13 @@ function Heatmap({ heatmap, isDark }: { heatmap: DemoApplication["heatmap"]; isD
                   onMouseLeave={() => setHoveredIdx(null)}
                 >
                   <div
-                    className="h-2 w-2 rounded-sm cursor-default transition-transform hover:scale-125"
+                    className="h-2 w-2 rounded-sm cursor-default hover:scale-125"
                     style={{
                       backgroundColor: "#00F5A0",
                       opacity: d.score / 100,
                       filter: isHigh ? "drop-shadow(0 0 4px rgba(0,245,160,0.7))" : undefined,
+                      transform: hoveredIdx === gi ? "scale(1.25)" : undefined,
+                      transition: "opacity 0.5s ease, transform 0.15s ease, filter 0.5s ease",
                     }}
                   />
                   {hoveredIdx === gi && (
@@ -79,32 +81,76 @@ function Heatmap({ heatmap, isDark }: { heatmap: DemoApplication["heatmap"]; isD
 
 
 
-function LiveDiff({ app, isDark }: { app: DemoApplication; isDark: boolean }) {
-  const [words, setWords] = useState<string[]>([]);
+function LiveDiff({
+  app,
+  isDark,
+  onDimensionUpdate,
+}: {
+  app: DemoApplication;
+  isDark: boolean;
+  onDimensionUpdate: (dimension: string, after: number) => void;
+}) {
+  const [chunks, setChunks] = useState<string[]>([]);
   const [streaming, setStreaming] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const idxRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const startStream = () => {
-    setWords([]);
-    idxRef.current = 0;
+  const startStream = useCallback(async () => {
+    if (streaming) return;
+    setChunks([]);
     setStreaming(true);
-  };
 
-  useEffect(() => {
-    if (!streaming) return;
-    const tick = () => {
-      if (idxRef.current >= MOCK_STREAM_WORDS.length) { setStreaming(false); return; }
-      setWords((prev) => [...prev, MOCK_STREAM_WORDS[idxRef.current]]);
-      idxRef.current++;
-      timerRef.current = setTimeout(tick, 40);
-    };
-    timerRef.current = setTimeout(tick, 40);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [streaming]);
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    try {
+      const resp = await fetch(`${_API_BASE}/resume/tailor-stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resume_text: app.resumeSample, jd_text: app.jd }),
+        signal: ctrl.signal,
+      });
+
+      if (!resp.ok || !resp.body) { setStreaming(false); return; }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const ev = JSON.parse(line.slice(6));
+            if (ev.type === "token") {
+              setChunks((prev) => [...prev, ev.text]);
+            } else if (ev.type === "dimension_update") {
+              onDimensionUpdate(ev.dimension, ev.after);
+            } else if (ev.type === "done") {
+              setStreaming(false);
+            }
+          } catch { /* malformed event */ }
+        }
+      }
+    } catch (e: unknown) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        // network / parse error — stop quietly
+      }
+    } finally {
+      setStreaming(false);
+    }
+  }, [app.resumeSample, app.jd, streaming, onDimensionUpdate]);
+
+  useEffect(() => () => { abortRef.current?.abort(); }, []);
 
   const surfaceBg = isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)";
   const surfaceBorder = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
+  const fullText = chunks.join("");
 
   return (
     <div id="cockpit-live-diff" className="flex-1 flex flex-col gap-3">
@@ -132,29 +178,15 @@ function LiveDiff({ app, isDark }: { app: DemoApplication; isDark: boolean }) {
 
       <div
         className="flex-1 overflow-y-auto rounded-2xl p-3 font-mono text-xs leading-relaxed backdrop-blur-sm"
-        style={{
-          minHeight: "120px",
-          backgroundColor: surfaceBg,
-          border: `1px solid ${surfaceBorder}`,
-        }}
+        style={{ minHeight: "120px", backgroundColor: surfaceBg, border: `1px solid ${surfaceBorder}` }}
       >
-        {words.length === 0 ? (
+        {fullText.length === 0 ? (
           <span style={{ color: isDark ? "#475569" : "#94a3b8" }}>
             Press "Stream Tailor" to see live resume rewriting...
           </span>
         ) : (
           <>
-            {words.map((w, i) => (
-              <motion.span
-                key={i}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: i === words.length - 1 ? 0.7 : 1 }}
-                transition={{ duration: 0.08 }}
-                style={{ color: "#00F5A0" }}
-              >
-                {w}{" "}
-              </motion.span>
-            ))}
+            <span style={{ color: "#00F5A0", whiteSpace: "pre-wrap" }}>{fullText}</span>
             {streaming && (
               <span
                 className="inline-block h-3 w-0.5 align-middle animate-dot-pulse"
@@ -170,11 +202,7 @@ function LiveDiff({ app, isDark }: { app: DemoApplication; isDark: boolean }) {
       </div>
       <div
         className="rounded-2xl p-3 font-mono text-xs leading-relaxed"
-        style={{
-          backgroundColor: surfaceBg,
-          border: `1px solid ${surfaceBorder}`,
-          color: isDark ? "#475569" : "#94a3b8",
-        }}
+        style={{ backgroundColor: surfaceBg, border: `1px solid ${surfaceBorder}`, color: isDark ? "#475569" : "#94a3b8" }}
       >
         {app.resumeSample.split("\n").slice(0, 8).join("\n")}
       </div>
@@ -184,6 +212,19 @@ function LiveDiff({ app, isDark }: { app: DemoApplication; isDark: boolean }) {
 
 function ApplicationDetail({ app, onBack, isDark }: { app: DemoApplication; onBack: () => void; isDark: boolean }) {
   const [diffMode, setDiffMode] = useState(false);
+  const [liveScores, setLiveScores] = useState<Record<string, number>>({});
+
+  useEffect(() => { setLiveScores({}); }, [app.id]);
+
+  const handleDimensionUpdate = useCallback((dimension: string, after: number) => {
+    setLiveScores((prev) => ({ ...prev, [dimension]: after }));
+  }, []);
+
+  const mergedHeatmap = app.heatmap.map((d) => ({
+    ...d,
+    score: liveScores[d.name] ?? d.score,
+  }));
+
   const textPrimary = isDark ? "#f0f4ff" : "#111827";
   const textDim = isDark ? "#94a3b8" : "#475569";
   const divider = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
@@ -235,7 +276,7 @@ function ApplicationDetail({ app, onBack, isDark }: { app: DemoApplication; onBa
             Fit: <span style={{ color: "#00F5A0", textShadow: "0 0 8px rgba(0,245,160,0.5)" }}>{app.fitScore}%</span>
           </span>
         </div>
-        <Heatmap heatmap={app.heatmap} isDark={isDark} />
+        <Heatmap heatmap={mergedHeatmap} isDark={isDark} />
       </div>
 
       {/* Body */}
@@ -248,7 +289,7 @@ function ApplicationDetail({ app, onBack, isDark }: { app: DemoApplication; onBa
         </div>
         <div className="w-1/2 overflow-y-auto p-4 flex flex-col gap-4">
           {diffMode ? (
-            <LiveDiff app={app} isDark={isDark} />
+            <LiveDiff app={app} isDark={isDark} onDimensionUpdate={handleDimensionUpdate} />
           ) : (
             <>
               <div className="flex justify-center pt-4">
