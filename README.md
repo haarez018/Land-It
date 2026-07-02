@@ -6,6 +6,8 @@ graduates who are serious about landing the right role.
 
 Live app: https://land-it-cockpit.apps.lemma.work
 
+Demo: https://drive.google.com/file/d/1WZ9N2B3xK7lqusAMn5sFKboajjp3h9Yk/view?usp=drive_link
+
 Built for the Gappy AI Hackathon — AI Job Application Command Centre track.
 
 ---
