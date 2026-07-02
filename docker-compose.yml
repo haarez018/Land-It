@@ -14,6 +14,15 @@ services:
     volumes:
       - ./data:/app/data
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
   redis:
     image: redis:7-alpine
     ports:
@@ -40,3 +49,5 @@ services:
       - .env
     depends_on:
       - redis
+    volumes:
+      - ./data:/app/data
